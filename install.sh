@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# 🧱 DWM by Dennis Hilk ~/.config/dwm)
+# 🧱 DWM by Dennis Hilk — Timeshift + Btrfs
 # ============================================================
 
 set -euo pipefail
@@ -40,6 +40,21 @@ sudo pacman -S --needed --noconfirm \
   pipewire pipewire-alsa pipewire-pulse pipewire-jack wireplumber pavucontrol
 
 sudo systemctl enable NetworkManager.service
+
+# ------------------------------------------------------------
+# 🧩 Timeshift + GRUB-Btrfs (if Btrfs detected)
+# ------------------------------------------------------------
+FSTYPE=$(findmnt -n -o FSTYPE / || echo "unknown")
+if [[ "$FSTYPE" == "btrfs" ]]; then
+  echo "=== 🧩 Btrfs detected — enabling Timeshift and GRUB-Btrfs..."
+  sudo pacman -S --needed --noconfirm timeshift timeshift-autosnap grub-btrfs
+  sudo systemctl enable grub-btrfs.path || true
+
+  echo "→ Timeshift will create automatic snapshots before system upgrades."
+  echo "→ Snapshots will appear in your GRUB menu under 'Arch Linux Snapshots'."
+else
+  echo "⚠️ Root filesystem is not Btrfs — skipping Timeshift integration."
+fi
 
 # ------------------------------------------------------------
 # 🔍 GPU Auto-Detection
@@ -91,14 +106,12 @@ build_local https://github.com/LukeSmithxyz/dwm.git dwm
 build_local https://github.com/LukeSmithxyz/dmenu.git dmenu
 build_local https://github.com/torrinfail/dwmblocks.git dwmblocks
 
-# Add ~/.local/bin to PATH if missing
 grep -q ".local/bin" ~/.bash_profile 2>/dev/null || \
   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bash_profile
 
 # ------------------------------------------------------------
 # 🎨 Gruvbox Config + Autostart
 # ------------------------------------------------------------
-echo "=== 🎨 Creating Gruvbox + Autostart config..."
 mkdir -p ~/.config/{alacritty,rofi,picom,fish}
 mkdir -p "$CONFIG_DIR"
 
@@ -216,5 +229,5 @@ fi
 echo "============================================================"
 echo "✅ Ready! Run:"
 echo "  ~/.config/dwm/install.sh"
-echo "Then reboot — system will boot directly into DWM."
+echo "Then reboot — system will boot directly into DWM with Timeshift snapshots."
 echo "============================================================"
