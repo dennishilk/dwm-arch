@@ -1,8 +1,9 @@
-# ============================================================
+![License](https://img.shields.io/badge/License-MIT-blue)
+![WindowManager](https://img.shields.io/badge/WM-DWM-blue)
+![Kernel](https://img.shields.io/badge/Kernel-Zen%20(Liquorix)-brightgreen)
+![GPU](https://img.shields.io/badge/GPU-NVIDIA%20%7C%20AMD-orange)
 # 🧱 DWM by Dennis Hilk — Gruvbox Edition 
-# ============================================================
 # Creates a full DWM environment i'm using arch btw
-# ============================================================
 
 ## ✨ Features
 
