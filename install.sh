@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
 # ============================================================
-# 🧱  DWM by Dennis Hilk — Final Edition (Zen + PipeWire + GPU + Fixes)
+# 🧱 DWM by Dennis Hilk ~/.config/dwm)
 # ============================================================
 
 set -euo pipefail
 trap 'echo "❌ Error at line $LINENO"; exit 1' ERR
 
-# --- Absolute script directory fix ---
+# Absolute path fix
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WALLPAPER_SRC="$SCRIPT_DIR/wallpaper.png"
 
-PROJECT_DIR="$HOME/dwm"
-INSTALL_SCRIPT="$PROJECT_DIR/install.sh"
+CONFIG_DIR="$HOME/.config/dwm"
+BIN_DIR="$HOME/.local/bin"
+INSTALL_SCRIPT="$CONFIG_DIR/install.sh"
 
-echo "=== 🧰 Creating DWM by Dennis Hilk setup..."
-mkdir -p "$PROJECT_DIR"
-cd "$PROJECT_DIR"
+mkdir -p "$CONFIG_DIR" "$BIN_DIR"
+echo "=== 🧰 Creating DWM setup in $CONFIG_DIR ..."
 
 # ------------------------------------------------------------
-# CREATE INSTALLER
+# INSTALL SCRIPT
 # ------------------------------------------------------------
 cat > "$INSTALL_SCRIPT" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 trap 'echo "❌ Error at line $LINENO"; exit 1' ERR
 
-echo "=== 🧠 System update..."
+echo "=== 🧠 Updating system..."
 sudo pacman -Syu --noconfirm
 
 # ------------------------------------------------------------
@@ -63,38 +63,44 @@ case "$GPU_VENDOR" in
 esac
 
 # ------------------------------------------------------------
-# 🧱 Build DWM + Dmenu + DWMBlocks (with fixes)
+# 🧱 Build DWM, Dmenu, DWMBlocks in ~/.config/dwm
 # ------------------------------------------------------------
-echo "=== 🧱 Building DWM, Dmenu, DWMBlocks..."
-cd ~
-mkdir -p ~/builds && cd ~/builds
+CONFIG_DIR="$HOME/.config/dwm"
+BIN_DIR="$HOME/.local/bin"
+mkdir -p "$CONFIG_DIR/src" "$BIN_DIR"
 
-clone_and_build () {
+echo "=== 🧱 Building user-local DWM stack..."
+
+build_local() {
   local REPO="$1"; local NAME="$2"
-  [ ! -d "$NAME" ] && git clone "$REPO" "$NAME"
-  cd "$NAME"
-
-  # glibc signal-fix
+  local DEST="$CONFIG_DIR/src/$NAME"
+  if [ ! -d "$DEST" ]; then
+    git clone "$REPO" "$DEST"
+  fi
+  cd "$DEST"
   sed -i 's/-Wall/& -Wno-incompatible-pointer-types/' config.mk 2>/dev/null || true
   sed -i 's/-Wall/& -Wno-incompatible-pointer-types/' Makefile 2>/dev/null || true
-
-  # Terminal-Fix → replace "st" with "alacritty"
   [ -f config.h ] && sed -i 's/"st"/"alacritty"/' config.h || true
-
-  echo "→ Building $NAME..."
-  sudo make clean install
-  cd ..
+  make clean
+  make
+  cp "$DEST/$NAME" "$BIN_DIR/$NAME"
+  chmod +x "$BIN_DIR/$NAME"
 }
 
-clone_and_build https://github.com/LukeSmithxyz/dwm.git dwm
-clone_and_build https://github.com/LukeSmithxyz/dmenu.git dmenu
-clone_and_build https://github.com/torrinfail/dwmblocks.git dwmblocks
+build_local https://github.com/LukeSmithxyz/dwm.git dwm
+build_local https://github.com/LukeSmithxyz/dmenu.git dmenu
+build_local https://github.com/torrinfail/dwmblocks.git dwmblocks
+
+# Add ~/.local/bin to PATH if missing
+grep -q ".local/bin" ~/.bash_profile 2>/dev/null || \
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bash_profile
 
 # ------------------------------------------------------------
-# 🎨 Gruvbox Setup
+# 🎨 Gruvbox Config + Autostart
 # ------------------------------------------------------------
-echo "=== 🎨 Applying Gruvbox configuration..."
-mkdir -p ~/.config/{alacritty,rofi,picom,fish} ~/.dwm ~/Pictures
+echo "=== 🎨 Creating Gruvbox + Autostart config..."
+mkdir -p ~/.config/{alacritty,rofi,picom,fish}
+mkdir -p "$CONFIG_DIR"
 
 # Alacritty
 cat > ~/.config/alacritty/alacritty.yml <<'YML'
@@ -155,28 +161,27 @@ CONF
 chsh -s /usr/bin/fish
 echo "fastfetch" >> ~/.config/fish/config.fish
 
-# ------------------------------------------------------------
-# 🪟 Autostart + xinitrc (with wallpaper delay)
-# ------------------------------------------------------------
-cat > ~/.dwm/autostart.sh <<'SH'
+# Autostart
+cat > "$CONFIG_DIR/autostart.sh" <<'SH'
 #!/usr/bin/env bash
 pipewire & wireplumber &
 picom --experimental-backends &
 nm-applet &
 dwmblocks &
-sleep 1 && feh --bg-fill ~/Pictures/wallpaper.png &
+sleep 1 && feh --bg-fill ~/.config/dwm/wallpaper.png &
 SH
-chmod +x ~/.dwm/autostart.sh
+chmod +x "$CONFIG_DIR/autostart.sh"
 
+# xinitrc
 cat > ~/.xinitrc <<'SH'
 #!/bin/sh
-~/.dwm/autostart.sh &
-exec dwm
+~/.config/dwm/autostart.sh &
+exec ~/.local/bin/dwm
 SH
 chmod +x ~/.xinitrc
 
 # ------------------------------------------------------------
-# 🔁 Auto-Login + startx
+# 🔁 Autologin + startx
 # ------------------------------------------------------------
 echo "=== ⚙️ Configuring auto-login..."
 sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
@@ -189,31 +194,27 @@ EOF2
 grep -q "startx" ~/.bash_profile 2>/dev/null || \
 echo '[[ -z $DISPLAY && $(tty) == /dev/tty1 ]] && startx' >> ~/.bash_profile
 
-# ------------------------------------------------------------
-# ✅ Done
-# ------------------------------------------------------------
 clear
 echo "============================================================"
 echo "✅ Installation complete!"
-echo "Reboot now to enter your DWM Gruvbox Zen environment."
+echo "Reboot to enter your user-local DWM Gruvbox Zen environment."
 echo "============================================================"
 EOF
 
 chmod +x "$INSTALL_SCRIPT"
 
 # ------------------------------------------------------------
-# Wallpaper copy (absolute path)
+# Copy wallpaper
 # ------------------------------------------------------------
 if [ -f "$WALLPAPER_SRC" ]; then
-  echo "🖼️  Copying wallpaper from: $WALLPAPER_SRC"
-  cp "$WALLPAPER_SRC" "$PROJECT_DIR/wallpaper.png"
+  echo "🖼️ Copying wallpaper from: $WALLPAPER_SRC"
+  cp "$WALLPAPER_SRC" "$CONFIG_DIR/wallpaper.png"
 else
   echo "⚠️ wallpaper.png not found in $SCRIPT_DIR"
 fi
 
 echo "============================================================"
-echo "✅ Project ready: $PROJECT_DIR"
-echo "Run once:"
-echo "  cd ~/dwm && ./install.sh"
+echo "✅ Ready! Run:"
+echo "  ~/.config/dwm/install.sh"
 echo "Then reboot — system will boot directly into DWM."
 echo "============================================================"
