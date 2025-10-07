@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
-# 🧱 DWM by Dennis Hilk — Zen + GPU + PipeWire
+# 🧱 DWM by Dennis Hilk — Gruvbox Edition 
+# ============================================================
+# Creates a full DWM environment i'm using arch btw
 # ============================================================
 
 set -e
