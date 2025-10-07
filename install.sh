@@ -1,26 +1,35 @@
 #!/usr/bin/env bash
 # ============================================================
-# 🧱 DWM by Dennis Hilk — Zen Kernel + PipeWire + Auto GPU + Gaming
+# 🧱 DWM by Dennis Hilk
+# ============================================================
+# Features:
+# - Zen Kernel + PipeWire + Auto GPU
+# - DWM + Dmenu + DWMBlocks (with glibc signal fix)
+# - Fish + Fastfetch + Gruvbox Theme
+# - Gaming & Browser menu
+# - Auto-login, Auto-startx
+# - All error-proof and single-run setup
 # ============================================================
 
-set -e
+set -euo pipefail
+trap 'echo "❌ Error at line $LINENO"; exit 1' ERR
+
 PROJECT_DIR="$HOME/dwm"
 WALLPAPER_SRC="$(dirname "$0")/wallpaper.png"
 INSTALL_SCRIPT="$PROJECT_DIR/install.sh"
 
-echo "=== 🧰 Creating DWM by Dennis Hilk setup..."
+echo "=== 🧰 Preparing environment..."
 mkdir -p "$PROJECT_DIR"
 cd "$PROJECT_DIR"
 
-# ------------------------------------------------------------
-# 🧩 INSTALL SCRIPT
-# ------------------------------------------------------------
+# --- CREATE INSTALLER ---------------------------------------
 cat > "$INSTALL_SCRIPT" <<'EOF'
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
+trap 'echo "❌ Error at line $LINENO"; exit 1' ERR
 
-echo "=== 🧠 Updating system..."
-sudo pacman -Syu --noconfirm
+echo "=== 🧠 System update..."
+sudo pacman -Syu --noconfirm || { echo "❌ pacman failed"; exit 1; }
 
 # ------------------------------------------------------------
 # ⚙️ Base + Zen Kernel + Audio Stack
@@ -34,57 +43,65 @@ sudo pacman -S --needed --noconfirm \
   pipewire pipewire-alsa pipewire-pulse pipewire-jack wireplumber pavucontrol
 
 sudo systemctl enable NetworkManager.service
-systemctl --user enable pipewire.service wireplumber.service pipewire-pulse.service || true
 
 # ------------------------------------------------------------
 # 🔍 GPU Auto-Detection
 # ------------------------------------------------------------
 echo "=== 🔍 Detecting GPU..."
-GPU_VENDOR=$(lspci | grep -E "VGA|3D" | grep -Eo 'NVIDIA|AMD|Intel' | head -n1)
+GPU_VENDOR=$(lspci | grep -E "VGA|3D" | grep -Eo 'NVIDIA|AMD|Intel' | head -n1 || echo "Unknown")
+
 case "$GPU_VENDOR" in
   NVIDIA)
-    echo "→ NVIDIA detected"
+    echo "→ NVIDIA GPU detected"
     sudo pacman -S --needed --noconfirm nvidia nvidia-utils nvidia-settings
     ;;
   AMD)
-    echo "→ AMD detected"
+    echo "→ AMD GPU detected"
     sudo pacman -S --needed --noconfirm mesa xf86-video-amdgpu vulkan-radeon
     ;;
   Intel)
-    echo "→ Intel detected"
+    echo "→ Intel GPU detected"
     sudo pacman -S --needed --noconfirm mesa xf86-video-intel vulkan-intel
     ;;
   *)
-    echo "⚠️ Unknown GPU, using generic Mesa"
+    echo "⚠️ GPU unknown, installing Mesa fallback"
     sudo pacman -S --needed --noconfirm mesa
     ;;
 esac
 
 # ------------------------------------------------------------
-# 🧱 DWM Build
+# 🧱 Build DWM safely with signal fix
 # ------------------------------------------------------------
-echo "=== 🧱 Building DWM, Dmenu, and DWMBlocks..."
-cd ~
-mkdir -p ~/builds && cd ~/builds
+echo "=== 🧱 Building DWM, Dmenu, DWMBlocks..."
+BUILD_DIR=~/builds
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
 
-git clone https://github.com/LukeSmithxyz/dwm.git dwm || true
-cd dwm
-sudo make clean install
+clone_and_build () {
+  local REPO="$1"
+  local NAME="$2"
+  if [ ! -d "$NAME" ]; then
+    git clone "$REPO" "$NAME"
+  fi
+  cd "$NAME"
 
-cd ..
-git clone https://github.com/LukeSmithxyz/dmenu.git dmenu || true
-cd dmenu
-sudo make clean install
+  # Signal fix for glibc
+  sed -i 's/-Wall/& -Wno-incompatible-pointer-types/' config.mk 2>/dev/null || true
+  sed -i 's/-Wall/& -Wno-incompatible-pointer-types/' Makefile 2>/dev/null || true
 
-cd ..
-git clone https://github.com/torrinfail/dwmblocks.git dwmblocks || true
-cd dwmblocks
-sudo make clean install
+  echo "→ Building $NAME..."
+  sudo make clean install || { echo "⚠️ $NAME build failed"; exit 1; }
+  cd ..
+}
+
+clone_and_build https://github.com/LukeSmithxyz/dwm.git dwm
+clone_and_build https://github.com/LukeSmithxyz/dmenu.git dmenu
+clone_and_build https://github.com/torrinfail/dwmblocks.git dwmblocks
 
 # ------------------------------------------------------------
 # 🎨 Gruvbox Setup
 # ------------------------------------------------------------
-echo "=== 🎨 Applying Gruvbox configuration..."
+echo "=== 🎨 Applying Gruvbox theme..."
 mkdir -p ~/.config/{alacritty,rofi,picom,fish} ~/.dwm ~/Pictures
 
 # Alacritty
@@ -142,7 +159,7 @@ fade-out-step = 0.03;
 opacity-rule = ["90:class_g = 'Alacritty'"];
 CONF
 
-# Fish + Fastfetch
+# Fish
 chsh -s /usr/bin/fish
 echo "fastfetch" >> ~/.config/fish/config.fish
 
@@ -174,13 +191,14 @@ chmod +x ~/.xinitrc
 # ------------------------------------------------------------
 # 🔁 Auto-Login + startx
 # ------------------------------------------------------------
-echo "=== ⚙️ Setting autologin..."
+echo "=== ⚙️ Configuring auto-login..."
 sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
 sudo tee /etc/systemd/system/getty@tty1.service.d/override.conf >/dev/null <<EOF2
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty --autologin $USER --noclear %I 38400 linux
 EOF2
+
 grep -q "startx" ~/.bash_profile 2>/dev/null || echo '[[ -z $DISPLAY && $(tty) == /dev/tty1 ]] && startx' >> ~/.bash_profile
 
 # ------------------------------------------------------------
@@ -222,24 +240,24 @@ while true; do
 done
 
 clear
-echo "=== ✅ Installation complete!"
-echo "Reboot to enter your DWM Gruvbox Zen environment."
+echo "✅ DWM installation complete!"
+echo "Reboot now to enter your Zen Gruvbox environment."
 EOF
 
 chmod +x "$INSTALL_SCRIPT"
 
 # ------------------------------------------------------------
-# Wallpaper Copy
+# Wallpaper copy
 # ------------------------------------------------------------
 if [ -f "$WALLPAPER_SRC" ]; then
   cp "$WALLPAPER_SRC" "$PROJECT_DIR/wallpaper.png"
 else
-  echo "⚠️ No wallpaper.png found – using plain Gruvbox background"
+  echo "⚠️ wallpaper.png not found, skipping."
 fi
 
 echo "============================================================"
 echo "✅ Project ready: $PROJECT_DIR"
-echo "Run:"
+echo "Run once:"
 echo "  cd ~/dwm && ./install.sh"
-echo "Then reboot – system will boot into DWM with PipeWire & Zen Kernel."
+echo "Then reboot — it will boot directly into DWM."
 echo "============================================================"
