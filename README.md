@@ -17,44 +17,48 @@
 - 🎮 **Interactive menu** to install browsers & gaming tools
 - 🚀 **Auto login and auto startx** – boots straight to DWM
 
----
-
 ## 🛠️ Installation
 
-Make sure you have a clean Arch Linux base system installed (e.g. via `archinstall`).
+Make sure you have a clean Arch Linux base system (e.g. via `archinstall`).  
+Then:
 
-Then run:
-
+```bash
 git clone https://github.com/dennishilk/dwm-arch.git
 cd dwm-arch
 chmod +x install.sh
 ./install.sh
 
+
 🎮 Optional Software Menu
 
-During setup, you’ll be prompted with a menu (via dialog) to choose optional tools:
-Each package can be toggled on/off before installation.
+During setup, a dialog menu lets you pick optional packages:
+
+Browsers: Firefox, Brave, Google Chrome
+Gaming / Tools: Steam, Lutris, Wine + Winetricks, ProtonUp-Qt, Gamemode, Heroic, Vulkan Tools, OBS Studio, MangoHud
+
+You can run the menu again later by re-running ./install.sh.
 
 
 📁 Directory Overview
 ~/dwm/
- ├── install.sh          → Main installer
- ├── wallpaper.png       → Your desktop background
- ├── README.md           → This documentation
+ ├─ install.sh           → Main installer
+ ├─ wallpaper.png        → Your desktop background (optional)
+ └─ README.md            → This file
 
-~/.config/alacritty/     → Terminal colors & fonts
-~/.config/rofi/          → App launcher (Gruvbox)
-~/.config/picom/         → Blur & transparency
-~/.config/fish/          → Shell + Fastfetch
-~/.dwm/autostart.sh      → Startup apps
-~/.xinitrc               → DWM session start
+~/.config/alacritty/     → Terminal colors & fonts (Gruvbox)
+~/.config/rofi/          → App launcher theme
+~/.config/picom/         → Blur & transparency settings
+~/.config/fish/          → Fish shell + Fastfetch on start
+~/.dwm/autostart.sh      → Startup apps for DWM session
+~/.xinitrc               → Starts DWM (used by startx)
+
 
 ⚙️ Tech Summary
-
-Kernel	Zen (optimized Arch kernel)
-Audio	PipeWire + PulseAudio bridge
-GPU	Auto-detects and installs NVIDIA/AMD/Intel drivers
-Shell	Fish with Fastfetch
+Component	Description
+Kernel	Zen (desktop-optimized Arch kernel)
+Audio	PipeWire + PulseAudio bridge + WirePlumber
+GPU	Auto-detects & installs NVIDIA/AMD/Intel
+Shell	Fish + Fastfetch
 Theme	Gruvbox (Alacritty, Rofi, Picom)
-Window Manager	DWM (patched build)
-Display Manager	None — direct autologin with systemd + startx
+WM	DWM (patched build)
+Display Mgr	None — systemd autologin + startx
