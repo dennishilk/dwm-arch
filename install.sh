@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# 🧱 DWM by Dennis Hilk 
+# 🧱  DWM by Dennis Hilk (Zen + PipeWire + GPU + Fixes)
 # ============================================================
 
 set -euo pipefail
@@ -10,25 +10,25 @@ PROJECT_DIR="$HOME/dwm"
 WALLPAPER_SRC="$(dirname "$0")/wallpaper.png"
 INSTALL_SCRIPT="$PROJECT_DIR/install.sh"
 
-echo "=== 🧰 Preparing DWM by Dennis Hilk setup..."
+echo "=== 🧰 Creating DWM by Dennis Hilk setup..."
 mkdir -p "$PROJECT_DIR"
 cd "$PROJECT_DIR"
 
 # ------------------------------------------------------------
-# CREATE INSTALL.SH
+# CREATE INSTALLER
 # ------------------------------------------------------------
 cat > "$INSTALL_SCRIPT" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 trap 'echo "❌ Error at line $LINENO"; exit 1' ERR
 
-echo "=== 🧠 Updating system..."
+echo "=== 🧠 System update..."
 sudo pacman -Syu --noconfirm
 
 # ------------------------------------------------------------
-# ⚙️ Base + Zen Kernel + PipeWire + Essentials
+# ⚙️ Base + Zen Kernel + PipeWire
 # ------------------------------------------------------------
-echo "=== ⚙️ Installing Zen kernel, PipeWire, and base packages..."
+echo "=== ⚙️ Installing Zen kernel, PipeWire, and essentials..."
 sudo pacman -S --needed --noconfirm \
   linux-zen linux-zen-headers base-devel git xorg xorg-xinit \
   alacritty rofi picom feh fish fastfetch htop btop \
@@ -47,40 +47,36 @@ GPU_VENDOR=$(lspci | grep -E "VGA|3D" | grep -Eo 'NVIDIA|AMD|Intel' | head -n1 |
 case "$GPU_VENDOR" in
   NVIDIA)
     echo "→ NVIDIA GPU detected"
-    sudo pacman -S --needed --noconfirm nvidia nvidia-utils nvidia-settings
-    ;;
+    sudo pacman -S --needed --noconfirm nvidia nvidia-utils nvidia-settings ;;
   AMD)
     echo "→ AMD GPU detected"
-    sudo pacman -S --needed --noconfirm mesa xf86-video-amdgpu vulkan-radeon
-    ;;
+    sudo pacman -S --needed --noconfirm mesa xf86-video-amdgpu vulkan-radeon ;;
   Intel)
     echo "→ Intel GPU detected"
-    sudo pacman -S --needed --noconfirm mesa xf86-video-intel vulkan-intel
-    ;;
+    sudo pacman -S --needed --noconfirm mesa xf86-video-intel vulkan-intel ;;
   *)
-    echo "⚠️ GPU unknown, installing Mesa fallback"
-    sudo pacman -S --needed --noconfirm mesa
-    ;;
+    echo "⚠️ Unknown GPU — installing Mesa fallback"
+    sudo pacman -S --needed --noconfirm mesa ;;
 esac
 
 # ------------------------------------------------------------
-# 🧱 Build DWM + Dmenu + DWMBlocks (safe)
+# 🧱 Build DWM + Dmenu + DWMBlocks (with fixes)
 # ------------------------------------------------------------
 echo "=== 🧱 Building DWM, Dmenu, DWMBlocks..."
 cd ~
 mkdir -p ~/builds && cd ~/builds
 
 clone_and_build () {
-  local REPO="$1"
-  local NAME="$2"
-  if [ ! -d "$NAME" ]; then
-    git clone "$REPO" "$NAME"
-  fi
+  local REPO="$1"; local NAME="$2"
+  [ ! -d "$NAME" ] && git clone "$REPO" "$NAME"
   cd "$NAME"
 
-  # fix signal warnings for new glibc
+  # glibc signal-fix
   sed -i 's/-Wall/& -Wno-incompatible-pointer-types/' config.mk 2>/dev/null || true
   sed -i 's/-Wall/& -Wno-incompatible-pointer-types/' Makefile 2>/dev/null || true
+
+  # Terminal-Fix → replace "st" with "alacritty"
+  [ -f config.h ] && sed -i 's/"st"/"alacritty"/' config.h || true
 
   echo "→ Building $NAME..."
   sudo make clean install
@@ -152,17 +148,12 @@ fade-out-step = 0.03;
 opacity-rule = ["90:class_g = 'Alacritty'"];
 CONF
 
-# Fish shell + Fastfetch
+# Fish + Fastfetch
 chsh -s /usr/bin/fish
 echo "fastfetch" >> ~/.config/fish/config.fish
 
-# Wallpaper
-if [ -f "$(dirname "$0")/wallpaper.png" ]; then
-  cp "$(dirname "$0")/wallpaper.png" ~/Pictures/wallpaper.png
-fi
-
 # ------------------------------------------------------------
-# 🪟 Autostart + xinitrc
+# 🪟 Autostart + xinitrc (with wallpaper delay)
 # ------------------------------------------------------------
 cat > ~/.dwm/autostart.sh <<'SH'
 #!/usr/bin/env bash
@@ -170,7 +161,7 @@ pipewire & wireplumber &
 picom --experimental-backends &
 nm-applet &
 dwmblocks &
-feh --bg-fill ~/Pictures/wallpaper.png &
+sleep 1 && feh --bg-fill ~/Pictures/wallpaper.png &
 SH
 chmod +x ~/.dwm/autostart.sh
 
@@ -184,7 +175,7 @@ chmod +x ~/.xinitrc
 # ------------------------------------------------------------
 # 🔁 Auto-Login + startx
 # ------------------------------------------------------------
-echo "=== ⚙️ Setting autologin..."
+echo "=== ⚙️ Configuring auto-login..."
 sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
 sudo tee /etc/systemd/system/getty@tty1.service.d/override.conf >/dev/null <<EOF2
 [Service]
@@ -192,27 +183,28 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin $USER --noclear %I 38400 linux
 EOF2
 
-grep -q "startx" ~/.bash_profile 2>/dev/null || echo '[[ -z $DISPLAY && $(tty) == /dev/tty1 ]] && startx' >> ~/.bash_profile
+grep -q "startx" ~/.bash_profile 2>/dev/null || \
+echo '[[ -z $DISPLAY && $(tty) == /dev/tty1 ]] && startx' >> ~/.bash_profile
 
 # ------------------------------------------------------------
-# ✅ Finish
+# ✅ Done
 # ------------------------------------------------------------
 clear
 echo "============================================================"
 echo "✅ Installation complete!"
-echo "Reboot to enter your DWM Gruvbox Zen environment."
+echo "Reboot now to enter your DWM Gruvbox Zen environment."
 echo "============================================================"
 EOF
 
 chmod +x "$INSTALL_SCRIPT"
 
 # ------------------------------------------------------------
-# Copy Wallpaper
+# Wallpaper copy
 # ------------------------------------------------------------
 if [ -f "$WALLPAPER_SRC" ]; then
   cp "$WALLPAPER_SRC" "$PROJECT_DIR/wallpaper.png"
 else
-  echo "⚠️ No wallpaper.png found – skipping."
+  echo "⚠️ wallpaper.png not found – skipping."
 fi
 
 echo "============================================================"
