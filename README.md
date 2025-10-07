@@ -1,60 +1,59 @@
-#!/usr/bin/env bash
 # ============================================================
 # 🧱 DWM by Dennis Hilk — Gruvbox Edition 
 # ============================================================
 # Creates a full DWM environment i'm using arch btw
 # ============================================================
 
-set -e
-
-# --- CONFIG --------------------------------------------------
-PROJECT_DIR="$HOME/dwm"
-WALLPAPER_SRC="$(dirname "$0")/wallpaper.png"
-INSTALL_SCRIPT="$PROJECT_DIR/install.sh"
-
-echo "=== 🧰 Creating DWM by Dennis Hilk setup..."
-mkdir -p "$PROJECT_DIR"
-cd "$PROJECT_DIR"
-
-# --- README --------------------------------------------------
-cat > "$PROJECT_DIR/README.md" <<'EOF'
-# 🧱 DWM by Dennis Hilk
-
-A clean, minimal and Gruvbox-themed **Dynamic Window Manager** setup for Arch Linux.  
-This setup keeps the raw speed and simplicity of **dwm**, while adding a modern look — including Rofi, Picom blur, and Alacritty styling.
-
----
-
 ## ✨ Features
 
-- 🧩 Patched **dwm**, **dmenu**, and **dwmblocks**
-- 🎨 Beautiful **Gruvbox theme** (Rofi + Alacritty + Picom)
-- 🪟 Transparent windows & blur effects
-- 🐟 **Fish shell** with Neofetch autostart
-- ⚡ Lightweight setup (< 500 MB RAM idle)
-- 🖼️ Custom wallpaper (`wallpaper.png` in the same folder)
-- 🎛️ Auto-start script for picom, nm-applet & dwmblocks
+- ⚡ **Zen Kernel** (optimized for desktop performance)
+- 🧩 **Patched DWM**, **Dmenu**, and **DWMBlocks**
+- 🔍 **Automatic GPU detection**
+  - Installs the correct drivers for **NVIDIA**, **AMD**, or **Intel**
+- 🔊 **PipeWire + WirePlumber + PulseAudio bridge**
+- 🐟 **Fish shell** + **Fastfetch** on terminal startup
+- 🎨 **Gruvbox theme**, **Rofi**, **Picom blur**, **Feh wallpaper**
+- 🎮 **Interactive menu** to install browsers & gaming tools
+- 🚀 **Auto login and auto startx** – boots straight to DWM
 
 ---
 
 ## 🛠️ Installation
 
-Make sure you already have a working **Arch Linux** base system with internet access.
+Make sure you have a clean Arch Linux base system installed (e.g. via `archinstall`).
 
-```bash
+Then run:
+
 git clone https://github.com/dennishilk/dwm-arch.git
 cd dwm-arch
 chmod +x install.sh
 ./install.sh
 
-📁 Directory Overview
-~/.config/alacritty/   → Terminal colors & font
-~/.config/rofi/        → App launcher theme
-~/.config/picom/       → Blur & transparency
-~/.dwm/autostart.sh    → Startup apps
-~/.xinitrc             → DWM session start
-~/Pictures/wallpaper.png
+🎮 Optional Software Menu
 
-📦 Dependencies Installed Automatically
-xorg xorg-xinit base-devel git alacritty rofi picom feh fish htop neofetch
-ttf-jetbrains-mono ttf-font-awesome ttf-nerd-fonts-symbols-mono
+During setup, you’ll be prompted with a menu (via dialog) to choose optional tools:
+Each package can be toggled on/off before installation.
+
+
+📁 Directory Overview
+~/dwm/
+ ├── install.sh          → Main installer
+ ├── wallpaper.png       → Your desktop background
+ ├── README.md           → This documentation
+
+~/.config/alacritty/     → Terminal colors & fonts
+~/.config/rofi/          → App launcher (Gruvbox)
+~/.config/picom/         → Blur & transparency
+~/.config/fish/          → Shell + Fastfetch
+~/.dwm/autostart.sh      → Startup apps
+~/.xinitrc               → DWM session start
+
+⚙️ Tech Summary
+
+Kernel	Zen (optimized Arch kernel)
+Audio	PipeWire + PulseAudio bridge
+GPU	Auto-detects and installs NVIDIA/AMD/Intel drivers
+Shell	Fish with Fastfetch
+Theme	Gruvbox (Alacritty, Rofi, Picom)
+Window Manager	DWM (patched build)
+Display Manager	None — direct autologin with systemd + startx
