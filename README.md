@@ -46,3 +46,15 @@ git clone https://github.com/dennishilk/dwm-arch.git
 cd dwm-arch
 chmod +x install.sh
 ./install.sh
+
+📁 Directory Overview
+~/.config/alacritty/   → Terminal colors & font
+~/.config/rofi/        → App launcher theme
+~/.config/picom/       → Blur & transparency
+~/.dwm/autostart.sh    → Startup apps
+~/.xinitrc             → DWM session start
+~/Pictures/wallpaper.png
+
+📦 Dependencies Installed Automatically
+xorg xorg-xinit base-devel git alacritty rofi picom feh fish htop neofetch
+ttf-jetbrains-mono ttf-font-awesome ttf-nerd-fonts-symbols-mono
