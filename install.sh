@@ -1,44 +1,36 @@
 #!/usr/bin/env bash
 # ============================================================
-# 🧱 DWM by Dennis Hilk
-# ============================================================
-# Features:
-# - Zen Kernel + PipeWire + Auto GPU
-# - DWM + Dmenu + DWMBlocks (with glibc signal fix)
-# - Fish + Fastfetch + Gruvbox Theme
-# - Gaming & Browser menu
-# - Auto-login, Auto-startx
-# - All error-proof and single-run setup
+# 🧱 DWM by Dennis Hilk 
 # ============================================================
 
+set -euo pipefail
+trap 'echo "❌ Error at line $LINENO"; exit 1' ERR
+
+PROJECT_DIR="$HOME/dwm"
+WALLPAPER_SRC="$(dirname "$0")/wallpaper.png"
+INSTALL_SCRIPT="$PROJECT_DIR/install.sh"
+
+echo "=== 🧰 Preparing DWM by Dennis Hilk setup..."
+mkdir -p "$PROJECT_DIR"
+cd "$PROJECT_DIR"
+
+# ------------------------------------------------------------
+# CREATE INSTALL.SH
+# ------------------------------------------------------------
+cat > "$INSTALL_SCRIPT" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 trap 'echo "❌ Error at line $LINENO"; exit 1' ERR
 
-echo "=== 🧠 System update..."
+echo "=== 🧠 Updating system..."
 sudo pacman -Syu --noconfirm
 
-# Ensure dialog & base tools
-sudo pacman -S --needed --noconfirm base-devel git dialog || true
-
 # ------------------------------------------------------------
-# 🧰 Install yay (AUR helper) if missing
+# ⚙️ Base + Zen Kernel + PipeWire + Essentials
 # ------------------------------------------------------------
-if ! command -v yay &>/dev/null; then
-  echo "=== 🧩 Installing yay (AUR helper)..."
-  cd /tmp
-  git clone https://aur.archlinux.org/yay-bin.git
-  cd yay-bin
-  makepkg -si --noconfirm
-  cd ~
-fi
-
-# ------------------------------------------------------------
-# ⚙️ Base + Zen Kernel + Audio Stack
-# ------------------------------------------------------------
-echo "=== ⚙️ Installing Zen kernel, PipeWire, and essentials..."
+echo "=== ⚙️ Installing Zen kernel, PipeWire, and base packages..."
 sudo pacman -S --needed --noconfirm \
-  linux-zen linux-zen-headers xorg xorg-xinit \
+  linux-zen linux-zen-headers base-devel git xorg xorg-xinit \
   alacritty rofi picom feh fish fastfetch htop btop \
   ttf-jetbrains-mono ttf-font-awesome ttf-nerd-fonts-symbols-mono \
   networkmanager network-manager-applet \
@@ -66,50 +58,166 @@ case "$GPU_VENDOR" in
     sudo pacman -S --needed --noconfirm mesa xf86-video-intel vulkan-intel
     ;;
   *)
-    echo "⚠️ GPU unknown, using Mesa fallback"
+    echo "⚠️ GPU unknown, installing Mesa fallback"
     sudo pacman -S --needed --noconfirm mesa
     ;;
 esac
 
 # ------------------------------------------------------------
-# 🎮 Optional Software Menu (safe)
+# 🧱 Build DWM + Dmenu + DWMBlocks (safe)
 # ------------------------------------------------------------
-echo "=== 🎮 Optional software selection..."
-while true; do
-  CHOICE=$(dialog --clear --stdout --checklist "Select optional software:" 20 70 10 \
-    1 "Firefox" on \
-    2 "Brave Browser" off \
-    3 "Google Chrome" off \
-    4 "Steam" on \
-    5 "Lutris" off \
-    6 "Wine + Winetricks" off \
-    7 "ProtonUp-Qt" off \
-    8 "Gamemode" on \
-    9 "Heroic Games Launcher" off \
-    10 "Vulkan Tools" on \
-    11 "OBS Studio" off \
-    12 "MangoHud" on ) || true
+echo "=== 🧱 Building DWM, Dmenu, DWMBlocks..."
+cd ~
+mkdir -p ~/builds && cd ~/builds
 
-  [[ -z "${CHOICE:-}" ]] && break
+clone_and_build () {
+  local REPO="$1"
+  local NAME="$2"
+  if [ ! -d "$NAME" ]; then
+    git clone "$REPO" "$NAME"
+  fi
+  cd "$NAME"
 
-  clear
-  echo "Installing: $CHOICE"
-  [[ $CHOICE == *"1"* ]] && sudo pacman -S --needed --noconfirm firefox
-  [[ $CHOICE == *"2"* ]] && yay -S --noconfirm brave-bin || sudo pacman -S --needed --noconfirm brave
-  [[ $CHOICE == *"3"* ]] && yay -S --noconfirm google-chrome || true
-  [[ $CHOICE == *"4"* ]] && sudo pacman -S --needed --noconfirm steam
-  [[ $CHOICE == *"5"* ]] && sudo pacman -S --needed --noconfirm lutris
-  [[ $CHOICE == *"6"* ]] && sudo pacman -S --needed --noconfirm wine winetricks
-  [[ $CHOICE == *"7"* ]] && sudo pacman -S --needed --noconfirm protonup-qt
-  [[ $CHOICE == *"8"* ]] && sudo pacman -S --needed --noconfirm gamemode
-  [[ $CHOICE == *"9"* ]] && yay -S --noconfirm heroic-games-launcher-bin || true
-  [[ $CHOICE == *"10"* ]] && sudo pacman -S --needed --noconfirm vulkan-tools
-  [[ $CHOICE == *"11"* ]] && sudo pacman -S --needed --noconfirm obs-studio
-  [[ $CHOICE == *"12"* ]] && sudo pacman -S --needed --noconfirm mangohud lib32-mangohud
+  # fix signal warnings for new glibc
+  sed -i 's/-Wall/& -Wno-incompatible-pointer-types/' config.mk 2>/dev/null || true
+  sed -i 's/-Wall/& -Wno-incompatible-pointer-types/' Makefile 2>/dev/null || true
 
-  dialog --yesno "Install more software?" 10 40 || break
-done
+  echo "→ Building $NAME..."
+  sudo make clean install
+  cd ..
+}
 
+clone_and_build https://github.com/LukeSmithxyz/dwm.git dwm
+clone_and_build https://github.com/LukeSmithxyz/dmenu.git dmenu
+clone_and_build https://github.com/torrinfail/dwmblocks.git dwmblocks
+
+# ------------------------------------------------------------
+# 🎨 Gruvbox Setup
+# ------------------------------------------------------------
+echo "=== 🎨 Applying Gruvbox configuration..."
+mkdir -p ~/.config/{alacritty,rofi,picom,fish} ~/.dwm ~/Pictures
+
+# Alacritty
+cat > ~/.config/alacritty/alacritty.yml <<'YML'
+import:
+  - ~/.config/alacritty/gruvbox.yml
+window:
+  opacity: 0.95
+  padding: {x:6, y:6}
+font:
+  normal:
+    family: JetBrainsMono Nerd Font
+    style: Regular
+  size: 11
+YML
+
+cat > ~/.config/alacritty/gruvbox.yml <<'YML'
+colors:
+  primary: {background: '0x282828', foreground: '0xebdbb2'}
+  normal:
+    black: '0x282828'
+    red: '0xcc241d'
+    green: '0x98971a'
+    yellow: '0xd79921'
+    blue: '0x458588'
+    magenta: '0xb16286'
+    cyan: '0x689d6a'
+    white: '0xa89984'
+YML
+
+# Rofi
+cat > ~/.config/rofi/gruvbox.rasi <<'RASI'
+* {
+  font: "JetBrainsMono Nerd Font 11";
+  background: #282828;
+  foreground: #ebdbb2;
+  selected: #458588;
+  border-radius: 8px;
+  padding: 5px;
+}
+window { width: 30%; }
+RASI
+
+# Picom
+cat > ~/.config/picom/picom.conf <<'CONF'
+backend = "glx";
+vsync = true;
+shadow = true;
+corner-radius = 10;
+blur-method = "dual_kawase";
+blur-strength = 6;
+fading = true;
+fade-in-step = 0.03;
+fade-out-step = 0.03;
+opacity-rule = ["90:class_g = 'Alacritty'"];
+CONF
+
+# Fish shell + Fastfetch
+chsh -s /usr/bin/fish
+echo "fastfetch" >> ~/.config/fish/config.fish
+
+# Wallpaper
+if [ -f "$(dirname "$0")/wallpaper.png" ]; then
+  cp "$(dirname "$0")/wallpaper.png" ~/Pictures/wallpaper.png
+fi
+
+# ------------------------------------------------------------
+# 🪟 Autostart + xinitrc
+# ------------------------------------------------------------
+cat > ~/.dwm/autostart.sh <<'SH'
+#!/usr/bin/env bash
+pipewire & wireplumber &
+picom --experimental-backends &
+nm-applet &
+dwmblocks &
+feh --bg-fill ~/Pictures/wallpaper.png &
+SH
+chmod +x ~/.dwm/autostart.sh
+
+cat > ~/.xinitrc <<'SH'
+#!/bin/sh
+~/.dwm/autostart.sh &
+exec dwm
+SH
+chmod +x ~/.xinitrc
+
+# ------------------------------------------------------------
+# 🔁 Auto-Login + startx
+# ------------------------------------------------------------
+echo "=== ⚙️ Setting autologin..."
+sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
+sudo tee /etc/systemd/system/getty@tty1.service.d/override.conf >/dev/null <<EOF2
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $USER --noclear %I 38400 linux
+EOF2
+
+grep -q "startx" ~/.bash_profile 2>/dev/null || echo '[[ -z $DISPLAY && $(tty) == /dev/tty1 ]] && startx' >> ~/.bash_profile
+
+# ------------------------------------------------------------
+# ✅ Finish
+# ------------------------------------------------------------
 clear
-echo "✅ Optional software installation finished!"
-echo "Reboot now to enter DWM."
+echo "============================================================"
+echo "✅ Installation complete!"
+echo "Reboot to enter your DWM Gruvbox Zen environment."
+echo "============================================================"
+EOF
+
+chmod +x "$INSTALL_SCRIPT"
+
+# ------------------------------------------------------------
+# Copy Wallpaper
+# ------------------------------------------------------------
+if [ -f "$WALLPAPER_SRC" ]; then
+  cp "$WALLPAPER_SRC" "$PROJECT_DIR/wallpaper.png"
+else
+  echo "⚠️ No wallpaper.png found – skipping."
+fi
+
+echo "============================================================"
+echo "✅ Project ready: $PROJECT_DIR"
+echo "Run once:"
+echo "  cd ~/dwm && ./install.sh"
+echo "Then reboot — system will boot directly into DWM."
+echo "============================================================"
