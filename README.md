@@ -29,36 +29,4 @@ chmod +x install.sh
 ./install.sh
 
 
-🎮 Optional Software Menu
 
-During setup, a dialog menu lets you pick optional packages:
-
-Browsers: Firefox, Brave, Google Chrome
-Gaming / Tools: Steam, Lutris, Wine + Winetricks, ProtonUp-Qt, Gamemode, Heroic, Vulkan Tools, OBS Studio, MangoHud
-
-You can run the menu again later by re-running ./install.sh.
-
-
-📁 Directory Overview
-~/dwm/
- ├─ install.sh           → Main installer
- ├─ wallpaper.png        → Your desktop background (optional)
- └─ README.md            → This file
-
-~/.config/alacritty/     → Terminal colors & fonts (Gruvbox)
-~/.config/rofi/          → App launcher theme
-~/.config/picom/         → Blur & transparency settings
-~/.config/fish/          → Fish shell + Fastfetch on start
-~/.dwm/autostart.sh      → Startup apps for DWM session
-~/.xinitrc               → Starts DWM (used by startx)
-
-
-⚙️ Tech Summary
-Component	Description
-Kernel	Zen (desktop-optimized Arch kernel)
-Audio	PipeWire + PulseAudio bridge + WirePlumber
-GPU	Auto-detects & installs NVIDIA/AMD/Intel
-Shell	Fish + Fastfetch
-Theme	Gruvbox (Alacritty, Rofi, Picom)
-WM	DWM (patched build)
-Display Mgr	None — systemd autologin + startx
