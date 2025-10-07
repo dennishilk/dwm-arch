@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================
-# 🧱  DWM by Dennis Hilk (Zen + PipeWire + GPU + Fixes)
+# 🧱  DWM by Dennis Hilk — Final Edition (Zen + PipeWire + GPU + Fixes)
 # ============================================================
 
 set -euo pipefail
 trap 'echo "❌ Error at line $LINENO"; exit 1' ERR
 
+# --- Absolute script directory fix ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WALLPAPER_SRC="$SCRIPT_DIR/wallpaper.png"
+
 PROJECT_DIR="$HOME/dwm"
-WALLPAPER_SRC="$(dirname "$0")/wallpaper.png"
 INSTALL_SCRIPT="$PROJECT_DIR/install.sh"
 
 echo "=== 🧰 Creating DWM by Dennis Hilk setup..."
@@ -199,12 +202,13 @@ EOF
 chmod +x "$INSTALL_SCRIPT"
 
 # ------------------------------------------------------------
-# Wallpaper copy
+# Wallpaper copy (absolute path)
 # ------------------------------------------------------------
 if [ -f "$WALLPAPER_SRC" ]; then
+  echo "🖼️  Copying wallpaper from: $WALLPAPER_SRC"
   cp "$WALLPAPER_SRC" "$PROJECT_DIR/wallpaper.png"
 else
-  echo "⚠️ wallpaper.png not found – skipping."
+  echo "⚠️ wallpaper.png not found in $SCRIPT_DIR"
 fi
 
 echo "============================================================"
