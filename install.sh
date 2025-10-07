@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# 🧱 DWM by Dennis Hilk — Gruvbox Edition 
-# ============================================================
-# Creates a full DWM environment i'm using arch btw
+# 🧱 DWM by Dennis Hilk — Zen Kernel + PipeWire + Auto GPU + Gaming
 # ============================================================
 
 set -e
@@ -27,7 +25,7 @@ sudo pacman -Syu --noconfirm
 # ------------------------------------------------------------
 # ⚙️ Base + Zen Kernel + Audio Stack
 # ------------------------------------------------------------
-echo "=== ⚙️ Installing Zen kernel, PipeWire and essentials..."
+echo "=== ⚙️ Installing Zen kernel, PipeWire, and essentials..."
 sudo pacman -S --needed --noconfirm \
   linux-zen linux-zen-headers base-devel git xorg xorg-xinit \
   alacritty rofi picom feh fish fastfetch htop btop dialog \
@@ -65,22 +63,28 @@ esac
 # ------------------------------------------------------------
 # 🧱 DWM Build
 # ------------------------------------------------------------
-echo "=== 🧱 Building DWM, Dmenu, DWMBlocks..."
+echo "=== 🧱 Building DWM, Dmenu, and DWMBlocks..."
 cd ~
 mkdir -p ~/builds && cd ~/builds
+
 git clone https://github.com/LukeSmithxyz/dwm.git dwm || true
-cd dwm && make clean install
+cd dwm
+sudo make clean install
+
 cd ..
 git clone https://github.com/LukeSmithxyz/dmenu.git dmenu || true
-cd dmenu && make clean install
+cd dmenu
+sudo make clean install
+
 cd ..
 git clone https://github.com/torrinfail/dwmblocks.git dwmblocks || true
-cd dwmblocks && make clean install
+cd dwmblocks
+sudo make clean install
 
 # ------------------------------------------------------------
 # 🎨 Gruvbox Setup
 # ------------------------------------------------------------
-echo "=== 🎨 Setting Gruvbox config..."
+echo "=== 🎨 Applying Gruvbox configuration..."
 mkdir -p ~/.config/{alacritty,rofi,picom,fish} ~/.dwm ~/Pictures
 
 # Alacritty
@@ -180,7 +184,7 @@ EOF2
 grep -q "startx" ~/.bash_profile 2>/dev/null || echo '[[ -z $DISPLAY && $(tty) == /dev/tty1 ]] && startx' >> ~/.bash_profile
 
 # ------------------------------------------------------------
-# 🎮 Optional Menu
+# 🎮 Optional Software Menu
 # ------------------------------------------------------------
 echo "=== 🎮 Optional software selection..."
 while true; do
