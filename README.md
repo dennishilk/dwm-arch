@@ -17,33 +17,6 @@
 - 🎮 **Interactive menu** to install browsers & gaming tools
 - 🚀 **Auto login and auto startx** – boots straight to DWM
 
-📁 Directory Overview
-~/dwm/
- ├─ install.sh           → Main installer
- ├─ wallpaper.png        → Your desktop background (optional)
- └─ README.md            → This file
-
-~/.config/alacritty/     → Terminal colors & fonts (Gruvbox)
-~/.config/rofi/          → App launcher theme
-~/.config/picom/         → Blur & transparency settings
-~/.config/fish/          → Fish shell + Fastfetch on start
-~/.dwm/autostart.sh      → Startup apps for DWM session
-~/.xinitrc               → Starts DWM (used by startx)
-
-
-⚙️ Tech Summary
-Component	Description
-Kernel	Zen (desktop-optimized Arch kernel)
-Audio	PipeWire + PulseAudio bridge + WirePlumber
-GPU	Auto-detects & installs NVIDIA/AMD/Intel
-Shell	Fish + Fastfetch
-Theme	Gruvbox (Alacritty, Rofi, Picom)
-WM	DWM (patched build)
-Display Mgr	None — systemd autologin + startx
-
-
-
-
 ## 🛠️ Installation
 
 Make sure you have a clean Arch Linux base system (e.g. via `archinstall`).  
