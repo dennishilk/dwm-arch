@@ -1,359 +1,153 @@
 #!/usr/bin/env bash
-# =============================================================================
-#  Arch DWM Installer (Self-Healing) — v2.1 
-#  - Menü (dialog): DWM+Alacritty+dmenu, picom, feh, PipeWire, Fish, TLP, ZRAM
-#  - Selbstheilend: Auto-Download/-Rebuild bei Fehlern, 3x Retry, Repair-Modus
-#  - User-Config in ~/.config/dwm, Autostart über TTY1 (ohne DM)
-#  - Logging: /var/log/dwm-install.log
-# =============================================================================
+# ════════════════════════════════════════════════
+# 🐧 Arch Linux DWM Ultimate v6 (by Dennis Hilk)
+# https://github.com/dennishilk
+# ════════════════════════════════════════════════
 
-set -Eeuo pipefail
+set -e
 
-LOGFILE="/var/log/dwm-install.log"
-mkdir -p "$(dirname "$LOGFILE")" || true
-touch "$LOGFILE" || true
-exec > >(tee -a "$LOGFILE") 2>&1
+echo "=== 🧩 Updating Arch system..."
+pacman -Syu --noconfirm
 
-COLOR_INFO="\033[1;32m"; COLOR_WARN="\033[1;33m"; COLOR_ERR="\033[1;31m"; COLOR_RST="\033[0m"
-info(){ echo -e "${COLOR_INFO}[INFO]${COLOR_RST} $*"; }
-warn(){ echo -e "${COLOR_WARN}[WARN]${COLOR_RST} $*"; }
-err(){  echo -e "${COLOR_ERR}[ERR ]${COLOR_RST} $*" >&2; }
-trap 'err "Fehler in Zeile $LINENO. Siehe Log: $LOGFILE"' ERR
+echo "=== ⚙️ Installing essential packages..."
+pacman -S --needed --noconfirm \
+  git base-devel xorg xorg-xinit xorg-xrandr \
+  alacritty feh picom fish rofi xwallpaper network-manager-applet \
+  pipewire pipewire-alsa pipewire-pulse wireplumber \
+  curl wget unzip
 
-need_root(){ [ "$(id -u)" = "0" ] || { err "Bitte als root/mit sudo ausführen."; exit 1; }; }
-need_arch(){ . /etc/os-release; [[ ${ID,,} = "arch" || ${ID_LIKE:-} =~ arch ]] || { err "Nur für Arch Linux."; exit 1; }; }
+# ────────────────────────────────────────────────
+# 🧠 Detect GPU and install drivers
+# ────────────────────────────────────────────────
+echo "=== 🎮 Detecting GPU and installing drivers..."
+GPU=$(lspci | grep -E "VGA|3D" | grep -E "NVIDIA|AMD|Intel" || true)
 
-retry(){
-  local tries="${1:-3}"; shift
-  local delay=5 i=1
-  until "$@"; do
-    if (( i >= tries )); then return 1; fi
-    warn "Befehl fehlgeschlagen (Versuch $i/$tries): $*"
-    sleep "$delay"; i=$((i+1))
-  done
-}
+if echo "$GPU" | grep -q "NVIDIA"; then
+    echo "→ NVIDIA GPU detected"
+    pacman -S --needed --noconfirm nvidia nvidia-utils nvidia-settings
+elif echo "$GPU" | grep -q "AMD"; then
+    echo "→ AMD GPU detected"
+    pacman -S --needed --noconfirm xf86-video-amdgpu mesa
+elif echo "$GPU" | grep -q "Intel"; then
+    echo "→ Intel GPU detected"
+    pacman -S --needed --noconfirm mesa xf86-video-intel
+else
+    echo "⚠️ No supported GPU detected – using default Mesa drivers."
+    pacman -S --needed --noconfirm mesa
+fi
 
-have(){ command -v "$1" >/dev/null 2>&1; }
-pkg_installed(){ pacman -Q "$1" >/dev/null 2>&1; }
-
-pkgs_install(){
-  local pkgs=() p
-  for p in "$@"; do pkg_installed "$p" || pkgs+=("$p"); done
-  (( ${#pkgs[@]} == 0 )) && return 0
-  info "Installiere Pakete: ${pkgs[*]}"
-  retry 3 pacman -Sy --noconfirm --needed "${pkgs[@]}"
-}
-
-ensure_build_stack(){ pkgs_install base-devel git xorg-server xorg-xinit libx11 libxft libxinerama ttf-dejavu; }
-ensure_dialog(){ have dialog || pkgs_install dialog; }
-
-select_target_user(){
-  if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
-    TARGET_USER="$SUDO_USER"
-  else
-    ensure_dialog
-    local guess; guess="$(awk -F: '$3>=1000 && $1!="nobody"{print $1; exit}' /etc/passwd || true)"
-    dialog --inputbox "Als welcher Benutzer sollen die DWM-Configs eingerichtet werden?\n(Nicht 'root')" 10 72 "${guess:-}" 2>/tmp/target_user.txt || { err "Abgebrochen."; exit 1; }
-    TARGET_USER="$(cat /tmp/target_user.txt)"
-  fi
-  id "$TARGET_USER" >/dev/null 2>&1 || { err "Benutzer '$TARGET_USER' existiert nicht."; exit 1; }
-  USER_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
-  [ -d "$USER_HOME" ] || { err "HOME für $TARGET_USER nicht gefunden."; exit 1; }
-  info "Zielbenutzer: $TARGET_USER ($USER_HOME)"
-}
-
-run_menu(){
-  ensure_dialog
-  dialog --checklist "Wähle Komponenten (Leertaste=toggle, Enter=OK)" 20 86 10 \
-    BASE_DWM   "DWM (Source) + Alacritty (Super+Return) + dmenu" ON \
-    PICOM      "Compositor (picom)"                               ON \
-    FEH        "feh (Wallpaper) + Handling"                        ON \
-    PIPEWIRE   "PipeWire (pipewire-alsa/pulse, wireplumber)"       ON \
-    FISH       "Fish Shell (als Default setzen)"                   ON \
-    TLP        "TLP Stromsparen (enable Service)"                  OFF \
-    ZRAM       "ZRAM (zram-generator, 50% RAM)"                    OFF \
-    RESCUE     "Rescue-Tools (Repair-Menü installieren)"           ON \
-    2>/tmp/choices.txt || { err "Abgebrochen."; exit 1; }
-  CHOICES="$(tr -d '"' < /tmp/choices.txt)"
-  info "Auswahl: $CHOICES"
-}
-sel(){ grep -qw "$1" <<<"$CHOICES"; }
-
-DWM_SRC="/usr/local/src/dwm"
-DWM_REPO="https://git.suckless.org/dwm"
-CFG_DIR="$USER_HOME/.config/dwm"
-AUTOSTART="$USER_HOME/.config/dwm/autostart.sh"
-PICOM_CFG="$USER_HOME/.config/dwm/picom.conf"
-XINITRC="$USER_HOME/.xinitrc"
-WALLPAPER="$USER_HOME/.config/dwm/wallpaper.png"
-
-backup_file(){ local p="$1"; [ -f "$p" ] || return 0; local ts; ts="$(date +%Y%m%d-%H%M%S)"; cp -a "$p" "${p}.bak-${ts}" || true; }
-
-write_dwm_config_h(){
-  cat > "$DWM_SRC/config.h" <<'EOF'
-#include <X11/XF86keysym.h>
-static const unsigned int borderpx  = 2;
-static const unsigned int snap      = 10;
-static const int showbar            = 1;
-static const int topbar             = 1;
-static const char *fonts[]          = { "DejaVuSansMono:size=10" };
-static const char dmenufont[]       = "DejaVuSansMono:size=10";
-static const char col_gray1[] = "#222222", col_gray2[] = "#444444",
-                 col_gray3[] = "#bbbbbb", col_gray4[] = "#eeeeee",
-                 col_cyan[]  = "#005577";
-static const char *colors[][3] = {
-  [SchemeNorm] = { col_gray3, col_gray1, col_gray2 },
-  [SchemeSel]  = { col_gray4, col_cyan,  col_cyan  },
-};
-static const char *tags[] = { "1","2","3","4","5","6","7","8","9" };
-static const Rule rules[] = { { "Gimp", NULL, NULL, 0, 1, -1 }, };
-static const float mfact = 0.55; static const int nmaster = 1; static const int resizehints = 1;
-static const Layout layouts[] = { { "[]=", tile }, { "><>", NULL }, { "[M]", monocle }, };
-#define MODKEY Mod4Mask
-#define TAGKEYS(KEY,TAG) \
-{ MODKEY, KEY, view, {.ui = 1 << TAG} }, \
-{ MODKEY|ControlMask, KEY, toggleview, {.ui = 1 << TAG} }, \
-{ MODKEY|ShiftMask, KEY, tag, {.ui = 1 << TAG} }, \
-{ MODKEY|ControlMask|ShiftMask, KEY, toggletag, {.ui = 1 << TAG} },
-static const char *termcmd[]  = { "alacritty", NULL };
-static const char *dmenucmd[] = { "dmenu_run", "-fn", dmenufont, NULL };
-static Key keys[] = {
-  { MODKEY, XK_p, spawn, {.v = dmenucmd } },
-  { MODKEY, XK_Return, spawn, {.v = termcmd } },
-  { MODKEY, XK_b, togglebar, {0} },
-  { MODKEY, XK_j, focusstack, {.i = +1 } },
-  { MODKEY, XK_k, focusstack, {.i = -1 } },
-  { MODKEY, XK_h, setmfact, {.f = -0.05} },
-  { MODKEY, XK_l, setmfact, {.f = +0.05} },
-  { MODKEY, XK_Tab, view, {0} },
-  { MODKEY|ShiftMask, XK_c, killclient, {0} },
-  { MODKEY, XK_t, setlayout, {.v = &layouts[0]} },
-  { MODKEY, XK_f, setlayout, {.v = &layouts[1]} },
-  { MODKEY, XK_m, setlayout, {.v = &layouts[2]} },
-  { MODKEY, XK_space, setlayout, {0} },
-  { MODKEY|ShiftMask, XK_space, togglefloating, {0} },
-  { MODKEY, XK_0, view, {.ui = ~0 } },
-  { MODKEY|ShiftMask, XK_0, tag, {.ui = ~0 } },
-  TAGKEYS( XK_1, 0 )
-  TAGKEYS( XK_2, 1 )
-  TAGKEYS( XK_3, 2 )
-  TAGKEYS( XK_4, 3 )
-  TAGKEYS( XK_5, 4 )
-  TAGKEYS( XK_6, 5 )
-  TAGKEYS( XK_7, 6 )
-  TAGKEYS( XK_8, 7 )
-  TAGKEYS( XK_9, 8 )
-  { MODKEY|ShiftMask, XK_q, quit, {0} },
-};
-static Button buttons[] = {
-  { ClkLtSymbol, 0, Button1, setlayout, {0} },
-  { ClkLtSymbol, 0, Button3, setlayout, {.v = &layouts[2]} },
-  { ClkWinTitle, 0, Button2, zoom, {0} },
-  { ClkStatusText, 0, Button2, spawn, {.v = termcmd } },
-  { ClkClientWin, MODKEY, Button1, movemouse, {0} },
-  { ClkClientWin, MODKEY, Button2, togglefloating, {0} },
-  { ClkClientWin, MODKEY, Button3, resizemouse, {0} },
-  { ClkTagBar, 0, Button1, view, {0} },
-  { ClkTagBar, 0, Button3, toggleview, {0} },
-  { ClkTagBar, MODKEY, Button1, tag, {0} },
-  { ClkTagBar, MODKEY, Button3, toggletag, {0} },
-};
-EOF
-}
-
-clone_or_update_dwm(){
-  mkdir -p "$DWM_SRC"
-  if [ -d "$DWM_SRC/.git" ]; then
-    info "Update DWM-Repo..."
-    (cd "$DWM_SRC" && retry 3 git fetch --depth=1 && git reset --hard origin/master)
-  else
-    info "Clone DWM-Repo..."
-    retry 3 git clone --depth=1 "$DWM_REPO" "$DWM_SRC"
-  fi
-}
-
-build_and_install_dwm(){
-  info "Baue und installiere DWM..."
-  pushd "$DWM_SRC" >/dev/null
-  [ -f config.h ] || { warn "config.h fehlt — erstelle neu…"; write_dwm_config_h; }
-  retry 3 make clean || true
-  if ! retry 3 make; then
-    warn "make fehlgeschlagen — Quellen neu klonen und erneut bauen…"
-    rm -rf "$DWM_SRC"; clone_or_update_dwm; write_dwm_config_h
-    retry 3 make clean || true
-    retry 3 make
-  fi
-  retry 3 make install
-  popd >/dev/null
-  info "DWM installiert nach /usr/local/bin/dwm"
-}
-
-install_base_stack(){ ensure_build_stack; pkgs_install dmenu alacritty; }
-install_picom(){ pkgs_install picom; }
-install_feh(){ pkgs_install feh; }
-install_pipewire(){ pkgs_install pipewire pipewire-alsa pipewire-pulse wireplumber; }
-install_fish(){ pkgs_install fish; chsh -s /usr/bin/fish "$TARGET_USER" || warn "chsh für $TARGET_USER fehlgeschlagen (ok)."; }
-install_tlp(){ pkgs_install tlp tlp-rdw; systemctl enable tlp >/dev/null 2>&1 || true; }
-install_zram(){
-  pkgs_install zram-generator
-  cat >/etc/systemd/zram-generator.conf <<'EOF'
+# ────────────────────────────────────────────────
+# 💾 Enable ZRAM for memory compression
+# ────────────────────────────────────────────────
+echo "=== 💾 Enabling ZRAM..."
+cat << 'EOF' > /etc/systemd/zram-generator.conf
 [zram0]
 zram-size = ram / 2
 compression-algorithm = zstd
 EOF
-  systemctl daemon-reload
-  systemctl enable systemd-zram-setup@zram0.service >/dev/null 2>&1 || true
-  systemctl start  systemd-zram-setup@zram0.service  >/dev/null 2>&1 || true
-}
 
-ensure_user_config(){
-  info "Erzeuge Benutzerkonfiguration unter $USER_HOME/.config/dwm …"
-  mkdir -p "$CFG_DIR"
+systemctl enable --now systemd-zram-setup@zram0.service || true
 
-  # autostart.sh
-  [ -f "$AUTOSTART" ] && backup_file "$AUTOSTART"
-  cat > "$AUTOSTART" <<'EOS'
-#!/usr/bin/env bash
-# DWM Autostart
-if command -v feh >/dev/null 2>&1 && [ -f "$HOME/.config/dwm/wallpaper.png" ]; then
-  feh --bg-scale "$HOME/.config/dwm/wallpaper.png"
-else
-  xsetroot -solid '#303030'
+# ────────────────────────────────────────────────
+# 🧱 Create DWM config folder
+# ────────────────────────────────────────────────
+echo "=== 🏗️ Creating config structure..."
+mkdir -p /home/$SUDO_USER/.config/dwm
+cd /home/$SUDO_USER/.config/dwm
+chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.config/dwm
+
+# ────────────────────────────────────────────────
+# 🧩 Clone and build suckless tools
+# ────────────────────────────────────────────────
+echo "=== 🧱 Cloning DWM, ST and DMENU..."
+sudo -u $SUDO_USER git clone https://git.suckless.org/dwm
+sudo -u $SUDO_USER git clone https://git.suckless.org/st
+sudo -u $SUDO_USER git clone https://git.suckless.org/dmenu
+
+echo "=== ⚙️ Building and installing..."
+cd /home/$SUDO_USER/.config/dwm/dwm
+sudo -u $SUDO_USER sed -i 's/Mod1Mask/Mod4Mask/g' config.h || true
+make clean install
+
+cd /home/$SUDO_USER/.config/dwm/st && make clean install
+cd /home/$SUDO_USER/.config/dwm/dmenu && make clean install
+
+# ────────────────────────────────────────────────
+# 🧠 Autostart
+# ────────────────────────────────────────────────
+echo "=== 🧠 Creating autostart.sh..."
+cat << 'EOF' > /home/$SUDO_USER/.config/dwm/autostart.sh
+#!/bin/bash
+# ────────────────────────────────────────────────
+# Autostart script for DWM Ultimate v6
+# ────────────────────────────────────────────────
+
+# Wallpaper
+if [ -f ~/.config/dwm/wallpaper.png ]; then
+    feh --bg-scale ~/.config/dwm/wallpaper.png &
 fi
-if command -v picom >/dev/null 2>&1; then
-  pgrep -x picom >/dev/null || picom --experimental-backends --daemon
-fi
-while true; do xsetroot -name "$(date '+%a %Y-%m-%d %H:%M')"; sleep 30; done &
-EOS
-  chmod +x "$AUTOSTART"
 
-  # picom.conf
-  [ -f "$PICOM_CFG" ] && backup_file "$PICOM_CFG"
-  cat > "$PICOM_CFG" <<'EOS'
-backend = "glx";
-vsync = true;
-shadow = false;
-fading = false;
-detect-client-opacity = true;
-detect-transient = true;
-detect-rounded-corners = true;
-EOS
+# Compositor
+picom --experimental-backends --config ~/.config/dwm/picom.conf &
 
-  # .xinitrc
-  [ -f "$XINITRC" ] && backup_file "$XINITRC"
-  cat > "$XINITRC" <<'EOS'
-#!/usr/bin/env bash
-[ -x "$HOME/.config/dwm/autostart.sh" ] && "$HOME/.config/dwm/autostart.sh" &
-xsetroot -cursor_name left_ptr
+# Network
+nm-applet &
+
+# Audio
+pipewire &
+wireplumber &
+
+# Applets
+# blueman-applet &
+
+# Statusbar (optional)
+# slstatus &
+EOF
+chmod +x /home/$SUDO_USER/.config/dwm/autostart.sh
+chown $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.config/dwm/autostart.sh
+
+# ────────────────────────────────────────────────
+# 🧠 XINITRC for startx
+# ────────────────────────────────────────────────
+echo "=== 🧩 Writing ~/.xinitrc ..."
+cat << 'EOF' > /home/$SUDO_USER/.xinitrc
+#!/bin/sh
+~/.config/dwm/autostart.sh &
 exec dwm
-EOS
-  chmod +x "$XINITRC"
+EOF
+chmod +x /home/$SUDO_USER/.xinitrc
+chown $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.xinitrc
 
-  # Wallpaper optional übernehmen
-  local script_dir; script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if [ -f "$script_dir/wallpaper.png" ]; then
-    install -m 0644 "$script_dir/wallpaper.png" "$WALLPAPER"
-  fi
+# ────────────────────────────────────────────────
+# 🐚 Fish shell as default
+# ────────────────────────────────────────────────
+echo "=== 🐚 Setting Fish as default shell..."
+chsh -s /usr/bin/fish $SUDO_USER
 
-  chown -R "$TARGET_USER:$TARGET_USER" "$CFG_DIR" "$XINITRC" 2>/dev/null || true
-}
+# ────────────────────────────────────────────────
+# 🧠 Fish aliases
+# ────────────────────────────────────────────────
+mkdir -p /home/$SUDO_USER/.config/fish
+cat << 'EOF' >> /home/$SUDO_USER/.config/fish/config.fish
 
-enable_tty1_autostart(){
-  # .bash_profile
-  local bp="$USER_HOME/.bash_profile"
-  touch "$bp"; chown "$TARGET_USER:$TARGET_USER" "$bp" 2>/dev/null || true
-  if ! grep -q 'exec startx' "$bp" 2>/dev/null; then
-    cat >> "$bp" <<'EOS'
-if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  exec startx
-fi
-EOS
-  fi
-  # .profile Fallback
-  local pr="$USER_HOME/.profile"
-  touch "$pr"; chown "$TARGET_USER:$TARGET_USER" "$pr" 2>/dev/null || true
-  if ! grep -q 'exec startx' "$pr" 2>/dev/null; then
-    cat >> "$pr" <<'EOS'
+# ── DWM aliases
+alias cdwm="cd ~/.config/dwm/dwm && sudo make clean install && cd -"
+alias mdwm="cd ~/.config/dwm/dwm && sudo make clean install && cd -"
+alias startdwm="startx"
+EOF
+chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.config/fish
 
-if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  exec startx
-fi
-EOS
-  fi
-}
-
-repair_all(){
-  info "Repair-Modus: Prüfe & repariere Installation…"
-  ensure_build_stack
-  pkg_installed dmenu || pkgs_install dmenu
-  have alacritty || pkgs_install alacritty
-  [ -x /usr/local/bin/dwm ] || warn "/usr/local/bin/dwm fehlt — (re)installiere…"
-  if [ ! -d "$DWM_SRC/.git" ]; then rm -rf "$DWM_SRC"; clone_or_update_dwm; else clone_or_update_dwm; fi
-  [ -f "$DWM_SRC/config.h" ] || write_dwm_config_h
-  build_and_install_dwm
-  ensure_user_config
-  enable_tty1_autostart
-  info "Repair-Modus abgeschlossen."
-}
-
-install_rescue_shortcut(){
-  cat >/usr/local/bin/dwm-rescue <<'EOS'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-menu(){
-  dialog --menu "DWM Rescue" 15 60 6 \
-    1 "DWM neu bauen" \
-    2 "Wallpaper neu setzen" \
-    3 "picom neu starten" \
-    4 "X neu starten (dwm neu)" \
-    5 "Abbrechen" 2>/tmp/dwm_rescue_choice || exit 0
-  case "$(cat /tmp/dwm_rescue_choice)" in
-    1) sudo bash -lc 'cd /usr/local/src/dwm && make clean && make && make install' && dialog --msgbox "DWM neu gebaut." 6 40;;
-    2) if command -v feh >/dev/null 2>&1 && [ -f "$HOME/.config/dwm/wallpaper.png" ]; then feh --bg-scale "$HOME/.config/dwm/wallpaper.png"; dialog --msgbox "Wallpaper gesetzt." 6 40; else dialog --msgbox "feh oder Wallpaper fehlt." 6 40; fi ;;
-    3) pkill -x picom || true; (picom --experimental-backends --daemon &) && dialog --msgbox "picom neu gestartet." 6 40;;
-    4) pkill -x Xorg || true;;
-    5) exit 0;;
-  esac
-}
-menu
-EOS
-  chmod +x /usr/local/bin/dwm-rescue
-}
-
-main(){
-  need_root; need_arch
-
-  if [[ "${1:-}" == "--repair" ]]; then
-    select_target_user
-    repair_all
-    info "Fertig. Log: $LOGFILE"
-    return 0
-  fi
-
-  select_target_user
-  run_menu
-
-  if sel BASE_DWM; then
-    install_base_stack
-    clone_or_update_dwm
-    write_dwm_config_h
-    build_and_install_dwm
-  fi
-  sel PICOM   && install_picom
-  sel FEH     && install_feh
-  sel PIPEWIRE&& install_pipewire
-  sel FISH    && install_fish
-  sel TLP     && install_tlp
-  sel ZRAM    && install_zram
-  sel RESCUE  && install_rescue_shortcut
-
-  ensure_user_config
-  enable_tty1_autostart
-
-  ensure_dialog
-  dialog --msgbox "Installation abgeschlossen.\n\nBenutzer: $TARGET_USER\nAutostart: TTY1 -> startx -> DWM\nTerminal: Super+Return (Alacritty)\nRescue: 'dwm-rescue' (falls gewählt)\nLog: $LOGFILE" 12 64
-
-  info "Fertig. Bitte als $TARGET_USER auf TTY1 einloggen. DWM startet automatisch."
-}
-
-main "$@"
+# ────────────────────────────────────────────────
+# ✅ Final info
+# ────────────────────────────────────────────────
+echo ""
+echo "╔══════════════════════════════════════════╗"
+echo "║ ✅ DWM Ultimate v6 Installation Complete ║"
+echo "╚══════════════════════════════════════════╝"
+echo ""
+echo "🎨 Config path: ~/.config/dwm"
+echo "💡 Start with: startx"
+echo "🧠 Default shell: Fish"
+echo "⚙️  GPU driver installed automatically"
+echo "💾 ZRAM enabled for performance"
+echo ""
