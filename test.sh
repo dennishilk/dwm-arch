@@ -14,10 +14,10 @@ pacman -S --needed --noconfirm \
   git base-devel xorg xorg-xinit xorg-xrandr \
   alacritty feh picom fish rofi xwallpaper network-manager-applet \
   pipewire pipewire-alsa pipewire-pulse wireplumber \
-  curl wget unzip
+  curl wget unzip xorg-xmodmap
 
 # ────────────────────────────────────────────────
-# 🧠 Detect GPU and install drivers
+# 🎮 GPU Auto-Detect
 # ────────────────────────────────────────────────
 echo "=== 🎮 Detecting GPU and installing drivers..."
 GPU=$(lspci | grep -E "VGA|3D" | grep -E "NVIDIA|AMD|Intel" || true)
@@ -37,7 +37,7 @@ else
 fi
 
 # ────────────────────────────────────────────────
-# 💾 Enable ZRAM for memory compression
+# 💾 ZRAM Setup
 # ────────────────────────────────────────────────
 echo "=== 💾 Enabling ZRAM..."
 cat << 'EOF' > /etc/systemd/zram-generator.conf
@@ -49,38 +49,63 @@ EOF
 systemctl enable --now systemd-zram-setup@zram0.service || true
 
 # ────────────────────────────────────────────────
-# 🧱 Create DWM config folder
+# 🏗️ DWM Directory
 # ────────────────────────────────────────────────
-echo "=== 🏗️ Creating config structure..."
-mkdir -p /home/$SUDO_USER/.config/dwm
-cd /home/$SUDO_USER/.config/dwm
-chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.config/dwm
+echo "=== 🏗️ Creating DWM config folder..."
+USER_HOME="/home/$SUDO_USER"
+mkdir -p "$USER_HOME/.config/dwm"
+chown -R $SUDO_USER:$SUDO_USER "$USER_HOME/.config/dwm"
+cd "$USER_HOME/.config/dwm"
 
 # ────────────────────────────────────────────────
-# 🧩 Clone and build suckless tools
+# 🧩 Clone suckless tools
 # ────────────────────────────────────────────────
 echo "=== 🧱 Cloning DWM, ST and DMENU..."
 sudo -u $SUDO_USER git clone https://git.suckless.org/dwm
 sudo -u $SUDO_USER git clone https://git.suckless.org/st
 sudo -u $SUDO_USER git clone https://git.suckless.org/dmenu
 
-echo "=== ⚙️ Building and installing..."
-cd /home/$SUDO_USER/.config/dwm/dwm
-sudo -u $SUDO_USER sed -i 's/Mod1Mask/Mod4Mask/g' config.h || true
+# ────────────────────────────────────────────────
+# ⚙️ Build with Super key + Alacritty
+# ────────────────────────────────────────────────
+echo "=== 🧠 Patching DWM for Super key and Alacritty..."
+cd "$USER_HOME/.config/dwm/dwm"
+
+# Falls config.h noch nicht existiert
+sudo -u $SUDO_USER cp -n config.def.h config.h
+
+# Alt → Super
+sudo -u $SUDO_USER sed -i 's/Mod1Mask/Mod4Mask/g' config.h
+
+# Standard-Terminal auf Alacritty setzen
+sudo -u $SUDO_USER sed -i 's|"st"|"alacritty"|g' config.h
+
+# Keybinding sicherstellen (Super+Return)
+if ! grep -q 'alacritty' config.h; then
+  echo 'static const char *termcmd[]  = { "alacritty", NULL };' >> config.h
+  sed -i '/return,/d' config.h
+  echo '{ MODKEY, XK_Return, spawn, {.v = termcmd } },' >> config.h
+fi
+
+echo "=== 🔨 Building and installing DWM..."
 make clean install
 
-cd /home/$SUDO_USER/.config/dwm/st && make clean install
-cd /home/$SUDO_USER/.config/dwm/dmenu && make clean install
+# ST + DMENU
+cd "$USER_HOME/.config/dwm/st" && make clean install
+cd "$USER_HOME/.config/dwm/dmenu" && make clean install
 
 # ────────────────────────────────────────────────
-# 🧠 Autostart
+# 🧠 Autostart Script
 # ────────────────────────────────────────────────
 echo "=== 🧠 Creating autostart.sh..."
-cat << 'EOF' > /home/$SUDO_USER/.config/dwm/autostart.sh
+cat << 'EOF' > "$USER_HOME/.config/dwm/autostart.sh"
 #!/bin/bash
 # ────────────────────────────────────────────────
 # Autostart script for DWM Ultimate v6
 # ────────────────────────────────────────────────
+
+# Fix Super key mapping (in case Mod4 not set)
+xmodmap -e "clear mod4" -e "add mod4 = Super_L Super_R"
 
 # Wallpaper
 if [ -f ~/.config/dwm/wallpaper.png ]; then
@@ -97,57 +122,54 @@ nm-applet &
 pipewire &
 wireplumber &
 
-# Applets
-# blueman-applet &
-
 # Statusbar (optional)
 # slstatus &
 EOF
-chmod +x /home/$SUDO_USER/.config/dwm/autostart.sh
-chown $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.config/dwm/autostart.sh
+
+chmod +x "$USER_HOME/.config/dwm/autostart.sh"
+chown $SUDO_USER:$SUDO_USER "$USER_HOME/.config/dwm/autostart.sh"
 
 # ────────────────────────────────────────────────
-# 🧠 XINITRC for startx
+# 🧠 XINITRC
 # ────────────────────────────────────────────────
-echo "=== 🧩 Writing ~/.xinitrc ..."
-cat << 'EOF' > /home/$SUDO_USER/.xinitrc
+echo "=== 🧩 Creating ~/.xinitrc ..."
+cat << 'EOF' > "$USER_HOME/.xinitrc"
 #!/bin/sh
 ~/.config/dwm/autostart.sh &
 exec dwm
 EOF
-chmod +x /home/$SUDO_USER/.xinitrc
-chown $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.xinitrc
+
+chmod +x "$USER_HOME/.xinitrc"
+chown $SUDO_USER:$SUDO_USER "$USER_HOME/.xinitrc"
 
 # ────────────────────────────────────────────────
-# 🐚 Fish shell as default
+# 🐚 Fish setup
 # ────────────────────────────────────────────────
 echo "=== 🐚 Setting Fish as default shell..."
 chsh -s /usr/bin/fish $SUDO_USER
 
-# ────────────────────────────────────────────────
-# 🧠 Fish aliases
-# ────────────────────────────────────────────────
-mkdir -p /home/$SUDO_USER/.config/fish
-cat << 'EOF' >> /home/$SUDO_USER/.config/fish/config.fish
+mkdir -p "$USER_HOME/.config/fish"
+cat << 'EOF' >> "$USER_HOME/.config/fish/config.fish"
 
-# ── DWM aliases
+# ── DWM Aliases ────────────────────────────────
 alias cdwm="cd ~/.config/dwm/dwm && sudo make clean install && cd -"
 alias mdwm="cd ~/.config/dwm/dwm && sudo make clean install && cd -"
 alias startdwm="startx"
 EOF
-chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.config/fish
+chown -R $SUDO_USER:$SUDO_USER "$USER_HOME/.config/fish"
 
 # ────────────────────────────────────────────────
-# ✅ Final info
+# ✅ Final message
 # ────────────────────────────────────────────────
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║ ✅ DWM Ultimate v6 Installation Complete ║"
+echo "║ ✅ DWM Ultimate v6 (by Dennis Hilk) Done ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 echo "🎨 Config path: ~/.config/dwm"
 echo "💡 Start with: startx"
 echo "🧠 Default shell: Fish"
-echo "⚙️  GPU driver installed automatically"
-echo "💾 ZRAM enabled for performance"
+echo "🖥  Super key fully mapped to Mod4"
+echo "⌨️  Super + Return = Alacritty"
+echo "💾 ZRAM active, GPU drivers auto-installed"
 echo ""
