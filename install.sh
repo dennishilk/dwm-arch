@@ -22,9 +22,9 @@ else
 fi
 
 # --- OPTIONAL PACKAGES ---
-read -rp "Install Steam + Wine (y/n): " steam
+read -rp "Install Steam + mangohud + gamemode (y/n): " steam
 if [[ $steam == "y" ]]; then
-    sudo pacman -Syu --noconfirm steam wine mangohud gamemode
+    sudo pacman -Syu --noconfirm steam mangohud gamemode
 fi
 
 read -rp "Install Google Chrome (AUR)? (y/n): " chrome
