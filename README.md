@@ -7,25 +7,37 @@ IN WORK <->
 ![WindowManager](https://img.shields.io/badge/WM-DWM-blue)
 ![Kernel](https://img.shields.io/badge/Kernel-Zen%20(Liquorix)-brightgreen)
 ![GPU](https://img.shields.io/badge/GPU-NVIDIA%20%7C%20AMD-orange)
-# 🧱 DWM by Dennis Hilk — Gruvbox Edition 
-# Creates a full DWM environment i'm using arch btw
+
+# 🐧 arch-dwm — Minimal DWM Setup for Arch Linux 
+   written By Dennis Hilk
+
+A clean, modular, and unpatched vanilla **[dwm](https://dwm.suckless.org/)** build for Arch Linux users who love minimalism, speed, and easy customization.
+
+This version comes without pre-applied patches (pure upstream code) — ideal for users who want to start simple and grow their window manager setup over time.
+
+---
 
 ## ✨ Features
 
-- ⚡ **Zen Kernel** (optimized for desktop performance)
-- 🧩 **Patched DWM**, **Dmenu**, and **DWMBlocks**
-- 🔍 **Automatic GPU detection**
-  - Installs the correct drivers for **NVIDIA**, **AMD**, or **Intel**
-- 🔊 **PipeWire + WirePlumber + PulseAudio bridge**
-- 🐟 **Fish shell** + **Fastfetch** on terminal startup
-- 🎨 **Gruvbox theme**, **Rofi**, **Picom blur**, **Feh wallpaper**
-- 🎮 **Interactive menu** to install browsers & gaming tools
-- 🚀 **Auto login and auto startx** – boots straight to DWM
+- 🖥️ **Vanilla dwm** (no patches, no bloat — fully yours to extend)
+- 🎨 **Gruvbox-Dark theme** (configurable in `config.h`)
+- 💻 **Alacritty terminal**, **Rofi launcher**, and **Google Chrome** keybindings
+- 🔌 **Auto-detected GPU drivers** (NVIDIA / AMD)
+- 🔧 Includes config files for:
+  - `sxhkd` (keybindings)
+  - `slstatus` (lightweight status bar)
+  - `picom` (compositor w/ rounded corners & opacity rules)
+  - `dunst` (notification daemon)
+  - `startx` autostart via `xinitrc`
+- 🚀 Optional install of **Steam**, **Wine**, and **Zen Kernel**
+- 📦 Easy install via `install.sh`
+- Once installed, reboot and run: startx
 
-## 🛠️ Installation
+---
 
-Make sure you have a clean Arch Linux base system (e.g. via `archinstall`).  
-Then:
+## ⚡ Installation (Arch Linux)
+
+Clone the repo and run the installer:
 
 ```bash
 git clone https://github.com/dennishilk/dwm-arch.git
@@ -33,12 +45,9 @@ cd dwm-arch
 chmod +x install.sh
 ./install.sh
 
-## 🎮 Optional Software Menu
 
-During setup, a dialog menu lets you pick optional packages:
 
-Browsers: Firefox, Brave, Google Chrome
-Gaming / Tools: Steam, Lutris, Wine + Winetricks, ProtonUp-Qt, Gamemode, Heroic, Vulkan Tools, OBS Studio, MangoHud
 
-You can run the menu again later by re-running ./install.sh.
+Once installed, reboot and run:
 
+startx
