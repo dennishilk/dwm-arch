@@ -1,5 +1,0 @@
-picom --experimental-backends &
-slstatus &
-sxhkd &
-feh --bg-fill ~/.wallpapers/wallpaper.png &
-exec dwm
