@@ -58,9 +58,10 @@ sudo apt install xorg xorg-dev build-essential sxhkd xdotool dbus-x11 libnotify-
 rofi dunst feh lxappearance network-manager-gnome lxpolkit \
 thunar thunar-archive-plugin thunar-volman gvfs-backends dialog mtools smbclient cifs-utils unzip \
 pavucontrol pulsemixer pamixer pipewire-audio \
-avahi-daemon acpi acpid xfce4-power-manager flameshot qimgv xdg-user-dirs-gtk fd-find \
+avahi-daemon acpi acpid xfce4-power-manager qimgv xdg-user-dirs-gtk fd-find \
 alacritty fonts-recommended fonts-font-awesome fonts-terminus \
-cmake meson ninja-build curl pkg-config
+zsh git curl wget \
+cmake meson ninja-build pkg-config
 "
     exit 0
 }
@@ -101,11 +102,15 @@ PACKAGES_AUDIO=(
 
 PACKAGES_UTILITIES=(
     avahi-daemon acpi acpid xfce4-power-manager
-    flameshot qimgv xdg-user-dirs-gtk fd-find
+    qimgv xdg-user-dirs-gtk fd-find
 )
 
 PACKAGES_TERMINAL=(
     alacritty
+)
+
+PACKAGES_SHELL=(
+    zsh git curl wget
 )
 
 PACKAGES_FONTS=(
@@ -113,7 +118,7 @@ PACKAGES_FONTS=(
 )
 
 PACKAGES_BUILD=(
-    cmake meson ninja-build curl pkg-config
+    cmake meson ninja-build pkg-config
 )
 
 # Install packages
@@ -126,10 +131,19 @@ if [ "$ONLY_CONFIG" = false ]; then
         "${PACKAGES_AUDIO[@]}" \
         "${PACKAGES_UTILITIES[@]}" \
         "${PACKAGES_TERMINAL[@]}" \
+        "${PACKAGES_SHELL[@]}" \
         "${PACKAGES_FONTS[@]}" \
         "${PACKAGES_BUILD[@]}" || die "Package installation failed"
 else
     msg "Skipping package installation (--only-config)"
+fi
+
+# Install Powerlevel10k for zsh
+if [ "$ONLY_CONFIG" = false ]; then
+    msg "Installing Powerlevel10k theme..."
+    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$HOME/.powerlevel10k"
+    echo 'source ~/.powerlevel10k/powerlevel10k.zsh-theme' >> "$HOME/.zshrc"
+    sudo chsh -s $(which zsh) "$USER" || msg "Could not set zsh as default shell. You can run 'chsh -s /bin/zsh' manually."
 fi
 
 # Handle existing config
@@ -152,18 +166,16 @@ msg "Copying suckless configs..."
 mkdir -p "$CONFIG_DIR"
 cp -r "$SCRIPT_DIR/suckless/"* "$CONFIG_DIR/" || die "Failed to copy configs"
 
-# Copy user wallpaper if present
+# Wallpaper support
 WALLPAPER_SOURCE="$SCRIPT_DIR/wallpaper.png"
 WALLPAPER_DEST="$CONFIG_DIR/wallpaper"
-
 if [ -f "$WALLPAPER_SOURCE" ]; then
     msg "Found wallpaper.png, copying to $WALLPAPER_DEST..."
     mkdir -p "$WALLPAPER_DEST"
     cp "$WALLPAPER_SOURCE" "$WALLPAPER_DEST/wallpaper.png"
 else
-    msg "No wallpaper.png found next to install.sh, skipping..."
+    msg "No wallpaper.png found next to install.sh, skipping wallpaper copy."
 fi
-
 
 # Patch config.h for Alacritty
 msg "Configuring Mod4+Return to launch Alacritty..."
@@ -189,3 +201,4 @@ fi
 msg "Installation complete!"
 echo -e "\nYou can now run ${GREEN}startx${NC} in any TTY to start DWM."
 echo "Press MOD+Return to open Alacritty."
+echo "ZSH + Powerlevel10k is installed. Restart your shell to configure it."
