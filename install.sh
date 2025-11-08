@@ -72,7 +72,11 @@ cp "$SCRIPT_DIR/polybar/launch.sh" "$POLYBAR_DIR/launch.sh"
 chmod +x "$POLYBAR_DIR/launch.sh"
 
 msg "Adding autostart scripts..."
+
+mkdir -p "$CONFIG_DIR/scripts"
+cp "$SCRIPT_DIR/suckless/scripts/autostart.sh" "$CONFIG_DIR/scripts/autostart.sh"
 chmod +x "$CONFIG_DIR/scripts/autostart.sh"
+
 
 msg "Installing Powerlevel10k..."
 git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$HOME/.powerlevel10k"
