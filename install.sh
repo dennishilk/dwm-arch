@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
-echo "🐧 Arch DWM Installer - by Dennis Hilk"
-
+echo "🐧 DWM-Arch Installer - by Dennis Hilk"
 CONFIG_DIR="$(pwd)/config"
 ASSETS_DIR="$(pwd)/assets"
 
 # --- BUILD DEPENDENCIES ---
 echo "🔧 Installing required build dependencies..."
-sudo pacman -Syu --noconfirm base-devel libx11 libxft libxinerama less
+sudo pacman -Syu --noconfirm base-devel libx11 libxft libxinerama git curl
 
 # --- GPU DRIVER DETECTION ---
 if lspci | grep -E "NVIDIA"; then
@@ -22,22 +21,22 @@ else
 fi
 
 # --- OPTIONAL PACKAGES ---
-read -rp "Install Steam + mangohud + gamemode (y/n): " steam
+read -rp "Install Steam + Wine (y/n): " steam
 if [[ $steam == "y" ]]; then
-    sudo pacman -Syu --noconfirm steam mangohud gamemode
+    sudo pacman -Syu --noconfirm steam wine gamemode mangohud
 fi
 
 read -rp "Install Google Chrome (AUR)? (y/n): " chrome
 if [[ $chrome == "y" ]]; then
-    if ! command -v yay &> /dev/null; then
-        echo "📦 Installing yay (AUR helper)..."
-        sudo pacman -S --needed --noconfirm base-devel git
-        rm -rf /tmp/yay
-        git clone https://aur.archlinux.org/yay-bin.git /tmp/yay
-        cd /tmp/yay && makepkg -si --noconfirm
-        cd -
-    fi
-    yay -S --noconfirm google-chrome
+  if ! command -v yay &> /dev/null; then
+    echo "📦 yay not found. Installing yay (AUR helper)..."
+    sudo pacman -S --needed --noconfirm git base-devel
+    git clone https://aur.archlinux.org/yay-bin.git /tmp/yay
+    cd /tmp/yay && makepkg -si --noconfirm
+    cd -
+  fi
+  echo "🌐 Installing Google Chrome..."
+  yay -S --noconfirm google-chrome
 fi
 
 read -rp "Use Zen Kernel instead of stock (y/n): " zen
@@ -65,40 +64,20 @@ echo "🧰 Installing core tools..."
 sudo pacman -Syu --noconfirm xorg-server xorg-xinit feh picom zsh sxhkd alacritty \
     rofi dunst thunar pavucontrol zram-generator htop
 
-# --- BUILD DWM (Vanilla, always clean clone) ---
-
-echo "📥 Building dwm from fresh source..."
-
-# Make sure we start with a clean clone
-if [ -d /tmp/dwm ]; then
-    echo "🗑️ Removing old /tmp/dwm directory..."
-    rm -rf /tmp/dwm
-fi
-
-echo "🔽 Cloning vanilla dwm repo..."
-git clone https://git.suckless.org/dwm /tmp/dwm
-
-# Set up config.h
-if [ ! -f config.h ]; then
-    echo "❌ ERROR: config.h not found in the current directory."
-    exit 1
-fi
-
-cp config.h /tmp/dwm/
-
-echo "🔧 Compiling and installing dwm..."
-cd /tmp/dwm
-sudo make clean install
-cd -
-
-echo "✅ dwm installed successfully!"
+# --- BUILD DWM ---
+echo "📥 Building dwm from source..."
+rm -rf /tmp/dwm-6.4
+curl -LO https://dl.suckless.org/dwm/dwm-6.4.tar.gz
+tar -xzf dwm-6.4.tar.gz -C /tmp
+cp config.h /tmp/dwm-6.4/
+cd /tmp/dwm-6.4 && sudo make clean install && cd -
 
 # --- BUILD SLSTATUS ---
 echo "📊 Building slstatus from source..."
 rm -rf /tmp/slstatus
 git clone https://git.suckless.org/slstatus /tmp/slstatus
-cp "$CONFIG_DIR/slstatus/config.h" /tmp/slstatus/.
-cd /tmp/slstatus && sudo make clean install
+cp "$CONFIG_DIR/slstatus/config.h" /tmp/slstatus/
+cd /tmp/slstatus && sudo make clean install && cd -
 
 # --- USER CONFIG FILES ---
 echo "🗂️ Copying user configs..."
@@ -115,4 +94,4 @@ echo "💾 Enabling zram..."
 echo -e "[zram0]\nzram-size = ram/2" | sudo tee /etc/systemd/zram-generator.conf
 
 echo
-echo "✅ Installation complete! Log in and run 'startx' to use DWM."
+echo "✅ Installation complete! Log out, select 'DWM' in LightDM, and enjoy!"
