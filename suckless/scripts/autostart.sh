@@ -7,7 +7,8 @@ lxpolkit &
 
 # background
 feh --bg-scale ~/.config/suckless/wallpaper/wallpaper.png &
-
+# Polybar
+"$HOME/.config/polybar/launch.sh" &
 # sxhkd
 # (re)load sxhkd for keybinds
 if hash sxhkd >/dev/null 2>&1; then
