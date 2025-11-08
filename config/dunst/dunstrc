@@ -1,0 +1,9 @@
+[global]
+    font = JetBrains Mono 10
+    separator_color = frame
+    padding = 12
+
+[urgency_low]
+    background = "#282828"
+    foreground = "#ebdbb2"
+    timeout = 4
