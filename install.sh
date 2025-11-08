@@ -65,12 +65,33 @@ echo "🧰 Installing core tools..."
 sudo pacman -Syu --noconfirm xorg-server xorg-xinit feh picom zsh sxhkd alacritty \
     rofi dunst thunar pavucontrol zram-generator htop
 
-# --- BUILD DWM ---
-echo "📥 Building dwm from source..."
-rm -rf /tmp/dwm
+# --- BUILD DWM (Vanilla, always clean clone) ---
+
+echo "📥 Building dwm from fresh source..."
+
+# Make sure we start with a clean clone
+if [ -d /tmp/dwm ]; then
+    echo "🗑️ Removing old /tmp/dwm directory..."
+    rm -rf /tmp/dwm
+fi
+
+echo "🔽 Cloning vanilla dwm repo..."
 git clone https://git.suckless.org/dwm /tmp/dwm
-cp config.h /tmp/dwm/.
-cd /tmp/dwm && sudo make clean install
+
+# Set up config.h
+if [ ! -f config.h ]; then
+    echo "❌ ERROR: config.h not found in the current directory."
+    exit 1
+fi
+
+cp config.h /tmp/dwm/
+
+echo "🔧 Compiling and installing dwm..."
+cd /tmp/dwm
+sudo make clean install
+cd -
+
+echo "✅ dwm installed successfully!"
 
 # --- BUILD SLSTATUS ---
 echo "📊 Building slstatus from source..."
