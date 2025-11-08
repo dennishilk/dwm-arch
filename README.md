@@ -31,7 +31,6 @@ This version comes without pre-applied patches (pure upstream code) — ideal fo
   - `startx` autostart via `xinitrc`
 - 🚀 Optional install of **Steam**, **Wine**, and **Zen Kernel**
 - 📦 Easy install via `install.sh`
-- Once installed, reboot and run: startx
 
 ---
 
@@ -45,9 +44,6 @@ cd dwm-arch
 chmod +x install.sh
 ./install.sh
 
-
-
-
 Once installed, reboot and run:
 
-startx
+startx ❤️
