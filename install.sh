@@ -152,6 +152,19 @@ msg "Copying suckless configs..."
 mkdir -p "$CONFIG_DIR"
 cp -r "$SCRIPT_DIR/suckless/"* "$CONFIG_DIR/" || die "Failed to copy configs"
 
+# Copy user wallpaper if present
+WALLPAPER_SOURCE="$SCRIPT_DIR/wallpaper.png"
+WALLPAPER_DEST="$CONFIG_DIR/wallpaper"
+
+if [ -f "$WALLPAPER_SOURCE" ]; then
+    msg "Found wallpaper.png, copying to $WALLPAPER_DEST..."
+    mkdir -p "$WALLPAPER_DEST"
+    cp "$WALLPAPER_SOURCE" "$WALLPAPER_DEST/wallpaper.png"
+else
+    msg "No wallpaper.png found next to install.sh, skipping..."
+fi
+
+
 # Patch config.h for Alacritty
 msg "Configuring Mod4+Return to launch Alacritty..."
 sed -i 's|{ MODKEY, XK_Return.*|{ MODKEY,           XK_Return, spawn,          SHCMD("alacritty") },|' "$CONFIG_DIR/dwm/config.h"
