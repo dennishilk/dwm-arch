@@ -31,9 +31,10 @@ static const char *colors[][3]      = {
 };
 
 static const char *const autostart[] = {
-	"sh", "-c", "~/.config/suckless/scripts/autostart.sh", NULL,
-	NULL /* terminate */
+    "sh", "-c", "~/.config/suckless/scripts/autostart.sh", NULL,
+    NULL /* terminate */
 };
+
 
 /* tagging */
 static const char *tags[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" };
