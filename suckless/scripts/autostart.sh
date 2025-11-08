@@ -6,7 +6,7 @@ slstatus &
 lxpolkit &
 
 # background
-feh --bg-scale ~/.config/suckless/wallpaper/wallhaven-218x7m_3440x1440.png &
+feh --bg-scale ~/.config/suckless/wallpaper/wallpaper.png &
 
 # sxhkd
 # (re)load sxhkd for keybinds
