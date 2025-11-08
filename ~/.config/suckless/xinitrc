@@ -1,7 +1,0 @@
-#!/bin/sh
-xsetroot -cursor_name left_ptr &
-feh --bg-fill ~/.config/suckless/wallpaper.png &
-picom --config ~/.config/suckless/picom/picom.conf &
-slstatus &
-sxhkd &
-exec dwm

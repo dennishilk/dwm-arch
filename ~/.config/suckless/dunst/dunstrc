@@ -1,7 +1,0 @@
-[global]
-    font = JetBrains Mono 10
-    frame_width = 1
-    separator_height = 2
-    transparency = 10
-    follow = keyboard
-    icon_theme = "Papirus"
