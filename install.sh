@@ -1,4 +1,29 @@
 #!/bin/bash
+#
+# DWM Setup Script (Debian-Based)
+#
+# This script includes adapted parts from:
+#   https://codeberg.org/justaguylinux/dwm-setup
+# Original project licensed under MIT License.
+# Modified and redistributed under similar terms.
+#
+# MIT License:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 set -e
 
@@ -34,6 +59,7 @@ done
 # Paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="$HOME/.config/suckless"
+POLYBAR_DIR="$HOME/.config/polybar"
 TEMP_DIR="/tmp/dwm_$$"
 LOG_FILE="$HOME/dwm-install.log"
 
@@ -50,6 +76,7 @@ NC='\033[0m'
 die() { echo -e "${RED}ERROR: $*${NC}" >&2; exit 1; }
 msg() { echo -e "${CYAN}$*${NC}"; }
 
+# Export package list and exit if requested
 export_packages() {
     echo "
 Required packages for DWM setup (Debian/Ubuntu):
@@ -60,17 +87,16 @@ thunar thunar-archive-plugin thunar-volman gvfs-backends dialog mtools smbclient
 pavucontrol pulsemixer pamixer pipewire-audio \
 avahi-daemon acpi acpid xfce4-power-manager qimgv xdg-user-dirs-gtk fd-find \
 alacritty fonts-recommended fonts-font-awesome fonts-terminus \
-zsh git curl wget \
+zsh git curl wget polybar \
 cmake meson ninja-build pkg-config
 "
     exit 0
 }
 
-# Export package list and exit if requested
 [ "$EXPORT_PACKAGES" = true ] && export_packages
 
 # Banner
-echo -e "${CYAN}--- DWM Setup (Debian-based) ---${NC}"
+echo -e "${CYAN}--- DWM Setup (Debian-Based) ---${NC}"
 read -p "Proceed with installation? (y/n) " -n 1 -r
 echo
 [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
@@ -102,7 +128,7 @@ PACKAGES_AUDIO=(
 
 PACKAGES_UTILITIES=(
     avahi-daemon acpi acpid xfce4-power-manager
-    qimgv xdg-user-dirs-gtk fd-find
+    qimgv xdg-user-dirs-gtk fd-find polybar
 )
 
 PACKAGES_TERMINAL=(
@@ -134,17 +160,13 @@ if [ "$ONLY_CONFIG" = false ]; then
         "${PACKAGES_SHELL[@]}" \
         "${PACKAGES_FONTS[@]}" \
         "${PACKAGES_BUILD[@]}" || die "Package installation failed"
-else
-    msg "Skipping package installation (--only-config)"
 fi
 
-# Install Powerlevel10k for zsh
-if [ "$ONLY_CONFIG" = false ]; then
-    msg "Installing Powerlevel10k theme..."
-    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$HOME/.powerlevel10k"
-    echo 'source ~/.powerlevel10k/powerlevel10k.zsh-theme' >> "$HOME/.zshrc"
-    sudo chsh -s $(which zsh) "$USER" || msg "Could not set zsh as default shell. You can run 'chsh -s /bin/zsh' manually."
-fi
+# Install Zsh + Powerlevel10k
+msg "Installing Powerlevel10k theme..."
+git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$HOME/.powerlevel10k"
+echo 'source ~/.powerlevel10k/powerlevel10k.zsh-theme' >> "$HOME/.zshrc"
+sudo chsh -s $(which zsh) "$USER" || msg "Could not set zsh as default shell. Run 'chsh -s /bin/zsh' manually."
 
 # Handle existing config
 if [ -d "$CONFIG_DIR" ]; then
@@ -173,20 +195,39 @@ if [ -f "$WALLPAPER_SOURCE" ]; then
     msg "Found wallpaper.png, copying to $WALLPAPER_DEST..."
     mkdir -p "$WALLPAPER_DEST"
     cp "$WALLPAPER_SOURCE" "$WALLPAPER_DEST/wallpaper.png"
-else
-    msg "No wallpaper.png found next to install.sh, skipping wallpaper copy."
 fi
 
 # Patch config.h for Alacritty
 msg "Configuring Mod4+Return to launch Alacritty..."
-sed -i 's|{ MODKEY, XK_Return.*|{ MODKEY,           XK_Return, spawn,          SHCMD("alacritty") },|' "$CONFIG_DIR/dwm/config.h"
+if [ -f "$CONFIG_DIR/dwm/config.h" ]; then
+    sed -i 's|{ MODKEY, XK_Return.*|{ MODKEY,           XK_Return, spawn,          SHCMD("alacritty") },|' "$CONFIG_DIR/dwm/config.h"
+else
+    msg "config.h not found – skipping keybinding patch"
+fi
 
-# Build DWM and slstatus
-msg "Building suckless tools (dwm, slstatus)..."
-for tool in dwm slstatus; do
-    cd "$CONFIG_DIR/$tool" || die "Missing $tool directory"
-    make && sudo make install || die "Build failed for $tool"
-done
+# Build DWM only (slstatus removed)
+msg "Building DWM..."
+cd "$CONFIG_DIR/dwm" || die "Missing DWM directory"
+make && sudo make install || die "DWM build failed"
+
+# Setup Polybar
+msg "Setting up Polybar..."
+mkdir -p "$POLYBAR_DIR"
+cp "$SCRIPT_DIR/polybar/config.ini" "$POLYBAR_DIR/config.ini"
+cp "$SCRIPT_DIR/polybar/launch.sh" "$POLYBAR_DIR/launch.sh"
+chmod +x "$POLYBAR_DIR/launch.sh"
+
+# DWM Autostart
+AUTOSTART="$CONFIG_DIR/dwm/autostart.sh"
+
+msg "Configuring DWM autostart..."
+{
+    echo "#!/bin/bash"
+    echo "feh --bg-scale $HOME/.config/suckless/wallpaper/wallpaper.png &"
+    echo "$POLYBAR_DIR/launch.sh &"
+    echo "picom -b &"
+} > "$AUTOSTART"
+chmod +x "$AUTOSTART"
 
 # Xinit setup for non-DM start
 if [ "$ONLY_CONFIG" = false ]; then
@@ -200,5 +241,5 @@ fi
 # Finish
 msg "Installation complete!"
 echo -e "\nYou can now run ${GREEN}startx${NC} in any TTY to start DWM."
-echo "Press MOD+Return to open Alacritty."
-echo "ZSH + Powerlevel10k is installed. Restart your shell to configure it."
+echo "Polybar and Picom are configured and launched automatically."
+echo "Press MOD+Return for Alacritty."
