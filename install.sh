@@ -8,7 +8,7 @@ ASSETS_DIR="$(pwd)/assets"
 
 # --- BUILD DEPENDENCIES ---
 echo "🔧 Installing required build dependencies..."
-sudo pacman -Syu --noconfirm base-devel libx11 libxft libxinerama
+sudo pacman -Syu --noconfirm base-devel libx11 libxft libxinerama less
 
 # --- GPU DRIVER DETECTION ---
 if lspci | grep -E "NVIDIA"; then
