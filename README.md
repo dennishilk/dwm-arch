@@ -2,7 +2,7 @@
 ![WindowManager](https://img.shields.io/badge/WM-DWM-blue)
 ![Terminal](https://img.shields.io/badge/Terminal-Alacritty-purple)
 
-# 🐧 test  
+# 🐧 testing
 _Built with ❤️ by Dennis Hilk_
 
 
